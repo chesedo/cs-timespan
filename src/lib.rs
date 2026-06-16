@@ -155,8 +155,8 @@ impl TimeSpan {
 
 /// Default `Display` uses the invariant `"c"` format: `[-][d.]hh:mm:ss[.fffffff]`
 impl std::fmt::Display for TimeSpan {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format_constant(&self.to_components()))
     }
 }
 
