@@ -641,7 +641,7 @@ mod parse_impl {
                     fi += 1;
                     let ch = fmt_chars[fi];
                     fi += 1;
-                    apply_spec(ch, 1, inp, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                    apply_spec(ch, 1, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
                 }
                 '%' => return Err(ParseError::InvalidFormat),
                 ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
@@ -649,7 +649,7 @@ mod parse_impl {
                     fi += n;
                     let max = match ch { 'd' => 8, 'h' | 'm' | 's' => 2, _ => 7 };
                     if n > max { return Err(ParseError::InvalidFormat); }
-                    apply_spec(ch, n, inp, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                    apply_spec(ch, n, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
                 }
                 '\\' if fi + 1 < fmt_chars.len() => {
                     fi += 1;
@@ -685,20 +685,20 @@ mod parse_impl {
     #[allow(clippy::too_many_arguments)]
     fn apply_spec<'a>(
         ch: char, n: usize,
-        inp: &'a str, inp_out: &mut &'a str,
+        inp: &mut &'a str,
         days: &mut Option<u64>, hours: &mut Option<u32>,
         minutes: &mut Option<u32>, seconds: &mut Option<u32>,
         frac: &mut Option<u32>,
     ) -> Result<(), ParseError> {
         macro_rules! dup { ($s:expr) => { if $s.is_some() { return Err(ParseError::InvalidFormat); } }; }
         match ch {
-            'd' => { dup!(days);    let v = if n == 1 { rd_grdy(inp, inp_out, 8)? } else { rd_exact(inp, inp_out, n)? }; *days = Some(v); }
-            'h' => { dup!(hours);   let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *hours = Some(v as u32); }
-            'm' => { dup!(minutes); let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *minutes = Some(v as u32); }
-            's' => { dup!(seconds); let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *seconds = Some(v as u32); }
+            'd' => { dup!(days);    let v = if n == 1 { rd_grdy(inp, 8)? } else { rd_exact(inp, n)? }; *days = Some(v); }
+            'h' => { dup!(hours);   let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *hours = Some(v as u32); }
+            'm' => { dup!(minutes); let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *minutes = Some(v as u32); }
+            's' => { dup!(seconds); let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *seconds = Some(v as u32); }
             'f' | 'F' => {
                 dup!(frac);
-                let v = rd_frac(inp, inp_out, n, ch == 'F')?;
+                let v = rd_frac(inp, n, ch == 'F')?;
                 *frac = Some(v);
             }
             _ => return Err(ParseError::InvalidFormat),
@@ -706,32 +706,32 @@ mod parse_impl {
         Ok(())
     }
 
-    fn rd_grdy<'a>(inp: &'a str, out: &mut &'a str, max: usize) -> Result<u64, ParseError> {
+    fn rd_grdy<'a>(inp: &mut &'a str, max: usize) -> Result<u64, ParseError> {
         let n = inp.bytes().take(max).take_while(|b| b.is_ascii_digit()).count();
         if n == 0 { return Err(ParseError::InvalidFormat); }
-        let s = &inp[..n];
-        *out = &inp[n..];
-        s.parse::<u64>().map_err(|_| ParseError::Overflow)
+        let v = inp[..n].parse::<u64>().map_err(|_| ParseError::Overflow)?;
+        *inp = &inp[n..];
+        Ok(v)
     }
 
-    fn rd_exact<'a>(inp: &'a str, out: &mut &'a str, n: usize) -> Result<u64, ParseError> {
+    fn rd_exact<'a>(inp: &mut &'a str, n: usize) -> Result<u64, ParseError> {
         if inp.len() < n || !inp[..n].bytes().all(|b| b.is_ascii_digit()) {
             return Err(ParseError::InvalidFormat);
         }
-        let s = &inp[..n];
-        *out = &inp[n..];
-        s.parse::<u64>().map_err(|_| ParseError::Overflow)
+        let v = inp[..n].parse::<u64>().map_err(|_| ParseError::Overflow)?;
+        *inp = &inp[n..];
+        Ok(v)
     }
 
-    fn rd_frac<'a>(inp: &'a str, out: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
+    fn rd_frac<'a>(inp: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
         if greedy {
             let count = inp.bytes().take(n).take_while(|b| b.is_ascii_digit()).count();
             if count == 0 { return Err(ParseError::InvalidFormat); }
             let v = inp[..count].parse::<u32>().unwrap();
-            *out = &inp[count..];
+            *inp = &inp[count..];
             Ok(v * 10u32.pow(7 - count as u32))
         } else {
-            rd_exact(inp, out, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
+            rd_exact(inp, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
         }
     }
 
