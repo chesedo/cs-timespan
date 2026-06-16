@@ -192,6 +192,8 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                     'h' => { out.push_str(&c.hours.to_string()); i += 1; }
                     'm' => { out.push_str(&c.minutes.to_string()); i += 1; }
                     's' => { out.push_str(&c.seconds.to_string()); i += 1; }
+                    'f' => { out.push_str(&fmt_frac(c.sub_sec_ticks, 1, false)); i += 1; }
+                    'F' => { out.push_str(&fmt_frac(c.sub_sec_ticks, 1, true)); i += 1; }
                     _ => todo!("custom specifier: %{}", chars[i]),
                 }
             }
@@ -203,6 +205,18 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                 } else {
                     out.push_str(&format!("{:02}", c.hours));
                 }
+                i += n;
+            }
+            // `f{n}` — fractional seconds, exactly n digits (1–7), no trimming
+            'f' => {
+                let n = run_length(&chars, i, 'f');
+                out.push_str(&fmt_frac(c.sub_sec_ticks, n, false));
+                i += n;
+            }
+            // `F{n}` — fractional seconds, up to n digits, trailing zeros trimmed
+            'F' => {
+                let n = run_length(&chars, i, 'F');
+                out.push_str(&fmt_frac(c.sub_sec_ticks, n, true));
                 i += n;
             }
             // `s` / `ss` — seconds component
@@ -241,6 +255,20 @@ fn format_custom(c: &Components, fmt: &str) -> String {
     }
 
     out
+}
+
+/// Format `sub_sec_ticks` (0..=9_999_999) as `n` fractional-second digits.
+/// If `trim` is true, trailing zeros are removed (uppercase `F` behaviour).
+fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
+    // Full 7-digit string, zero-padded
+    let full = format!("{:07}", sub_sec_ticks);
+    // Take the first `n` digits
+    let s = &full[..n];
+    if trim {
+        s.trim_end_matches('0').to_string()
+    } else {
+        s.to_string()
+    }
 }
 
 fn run_length(chars: &[char], start: usize, ch: char) -> usize {
