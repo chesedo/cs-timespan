@@ -190,6 +190,7 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                 match chars[i] {
                     'd' => { out.push_str(&c.days.to_string()); i += 1; }
                     'h' => { out.push_str(&c.hours.to_string()); i += 1; }
+                    'm' => { out.push_str(&c.minutes.to_string()); i += 1; }
                     _ => todo!("custom specifier: %{}", chars[i]),
                 }
             }
@@ -200,6 +201,16 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                     out.push_str(&c.hours.to_string());
                 } else {
                     out.push_str(&format!("{:02}", c.hours));
+                }
+                i += n;
+            }
+            // `m` / `mm` — minutes component
+            'm' => {
+                let n = run_length(&chars, i, 'm');
+                if n == 1 {
+                    out.push_str(&c.minutes.to_string());
+                } else {
+                    out.push_str(&format!("{:02}", c.minutes));
                 }
                 i += n;
             }
