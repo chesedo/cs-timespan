@@ -189,8 +189,19 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                 i += 1;
                 match chars[i] {
                     'd' => { out.push_str(&c.days.to_string()); i += 1; }
+                    'h' => { out.push_str(&c.hours.to_string()); i += 1; }
                     _ => todo!("custom specifier: %{}", chars[i]),
                 }
+            }
+            // `h` / `hh` — hours component (hh always 2 digits)
+            'h' => {
+                let n = run_length(&chars, i, 'h');
+                if n == 1 {
+                    out.push_str(&c.hours.to_string());
+                } else {
+                    out.push_str(&format!("{:02}", c.hours));
+                }
+                i += n;
             }
             // `d{n}` — days padded to at least n digits
             'd' => {
