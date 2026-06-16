@@ -687,13 +687,13 @@ mod parse_impl {
     ) -> Result<(), ParseError> {
         macro_rules! dup { ($s:expr) => { if $s.is_some() { return Err(ParseError::InvalidFormat); } }; }
         match ch {
-            'd' => { dup!(days);    let v = if n == 1 { rd_grdy(inp, 8)? } else { rd_exact(inp, n)? }; *days = Some(v); }
-            'h' => { dup!(hours);   let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *hours = Some(v as u32); }
-            'm' => { dup!(minutes); let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *minutes = Some(v as u32); }
-            's' => { dup!(seconds); let v = if n == 1 { rd_grdy(inp, 2)? } else { rd_exact(inp, n)? }; *seconds = Some(v as u32); }
+            'd' => { dup!(days);    let v = if n == 1 { read_greedy(inp, 8)? } else { read_exact(inp, n)? }; *days = Some(v); }
+            'h' => { dup!(hours);   let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *hours = Some(v as u32); }
+            'm' => { dup!(minutes); let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *minutes = Some(v as u32); }
+            's' => { dup!(seconds); let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *seconds = Some(v as u32); }
             'f' | 'F' => {
                 dup!(frac);
-                let v = rd_frac(inp, n, ch == 'F')?;
+                let v = read_frac(inp, n, ch == 'F')?;
                 *frac = Some(v);
             }
             _ => return Err(ParseError::InvalidFormat),
@@ -701,7 +701,7 @@ mod parse_impl {
         Ok(())
     }
 
-    fn rd_grdy<'a>(inp: &mut &'a str, max: usize) -> Result<u64, ParseError> {
+    fn read_greedy<'a>(inp: &mut &'a str, max: usize) -> Result<u64, ParseError> {
         let n = inp.bytes().take(max).take_while(|b| b.is_ascii_digit()).count();
         if n == 0 { return Err(ParseError::InvalidFormat); }
         let v = inp[..n].parse::<u64>().map_err(|_| ParseError::Overflow)?;
@@ -709,7 +709,7 @@ mod parse_impl {
         Ok(v)
     }
 
-    fn rd_exact<'a>(inp: &mut &'a str, n: usize) -> Result<u64, ParseError> {
+    fn read_exact<'a>(inp: &mut &'a str, n: usize) -> Result<u64, ParseError> {
         if inp.len() < n || !inp[..n].bytes().all(|b| b.is_ascii_digit()) {
             return Err(ParseError::InvalidFormat);
         }
@@ -718,7 +718,7 @@ mod parse_impl {
         Ok(v)
     }
 
-    fn rd_frac<'a>(inp: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
+    fn read_frac<'a>(inp: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
         if greedy {
             let count = inp.bytes().take(n).take_while(|b| b.is_ascii_digit()).count();
             if count == 0 { return Err(ParseError::InvalidFormat); }
@@ -726,7 +726,7 @@ mod parse_impl {
             *inp = &inp[count..];
             Ok(v * 10u32.pow(7 - count as u32))
         } else {
-            rd_exact(inp, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
+            read_exact(inp, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
         }
     }
 
