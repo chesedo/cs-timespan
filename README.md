@@ -8,10 +8,13 @@ A Rust library whose sole intent is to be a drop-in replacement for the C# `Syst
 
 > Construction of time intervals is intentionally delegated to [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html). `std::time::Duration` is unsigned and cannot represent negative intervals; `chrono::TimeDelta` supports negative values and is the closer equivalent to `System.TimeSpan`. Use whichever suits your project, then convert into this crate's types for parsing/formatting.
 
-- [ ] `From<chrono::TimeDelta>` for `TimeSpan`
-- [ ] `From<TimeSpan>` for `chrono::TimeDelta`
 - [ ] `From<std::time::Duration>` for `TimeSpan` (always succeeds — `Duration` is unsigned)
 - [ ] `TryFrom<TimeSpan>` for `std::time::Duration` (fails if the interval is negative)
+
+The following require the `chrono` feature flag:
+
+- [ ] `From<chrono::TimeDelta>` for `TimeSpan` *(feature: `chrono`)*
+- [ ] `From<TimeSpan>` for `chrono::TimeDelta` *(feature: `chrono`)*
 
 ### Constants
 
