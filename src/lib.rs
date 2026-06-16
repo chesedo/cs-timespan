@@ -337,14 +337,7 @@ fn run_length(chars: &[char], start: usize, ch: char) -> usize {
 }
 
 mod parse_impl {
-    use super::{Culture, ParseError, TimeSpan};
-
-    fn dec_sep(culture: Culture) -> char {
-        match culture {
-            Culture::Invariant => '.',
-            Culture::HrHR | Culture::FrFR => ',',
-        }
-    }
+    use super::{decimal_sep, Culture, ParseError, TimeSpan};
 
     fn parse_uint(s: &str) -> Result<u64, ParseError> {
         if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
@@ -397,7 +390,7 @@ mod parse_impl {
             return Err(ParseError::InvalidFormat);
         }
 
-        let sep = dec_sep(culture);
+        let sep = decimal_sep(culture);
 
         let (neg, s) = if let Some(r) = s.strip_prefix('-') {
             (true, r)
