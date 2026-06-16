@@ -192,11 +192,26 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                     _ => todo!("custom specifier: %{}", chars[i]),
                 }
             }
+            // `d{n}` — days padded to at least n digits
+            'd' => {
+                let n = run_length(&chars, i, 'd');
+                let s = c.days.to_string();
+                if s.len() < n {
+                    out.push_str(&format!("{:0>width$}", s, width = n));
+                } else {
+                    out.push_str(&s);
+                }
+                i += n;
+            }
             _ => todo!("custom format char: {:?}", chars[i]),
         }
     }
 
     out
+}
+
+fn run_length(chars: &[char], start: usize, ch: char) -> usize {
+    chars[start..].iter().take_while(|&&c| c == ch).count()
 }
 
 #[cfg(feature = "chrono")]
