@@ -244,70 +244,16 @@ fn format_custom(c: &Components, fmt: &str) -> String {
 
     while i < chars.len() {
         match chars[i] {
-            // `%x` — single specifier written with explicit percent
+            // `%x` — single specifier written with explicit percent prefix
             '%' if i + 1 < chars.len() => {
                 i += 1;
-                match chars[i] {
-                    'd' => { out.push_str(&c.days.to_string()); i += 1; }
-                    'h' => { out.push_str(&c.hours.to_string()); i += 1; }
-                    'm' => { out.push_str(&c.minutes.to_string()); i += 1; }
-                    's' => { out.push_str(&c.seconds.to_string()); i += 1; }
-                    'f' => { out.push_str(&fmt_frac(c.sub_sec_ticks, 1, false)); i += 1; }
-                    'F' => { out.push_str(&fmt_frac(c.sub_sec_ticks, 1, true)); i += 1; }
-                    _ => todo!("custom specifier: %{}", chars[i]),
-                }
+                out.push_str(&format_specifier(c, chars[i], 1));
+                i += 1;
             }
-            // `h` / `hh` — hours component (hh always 2 digits)
-            'h' => {
-                let n = run_length(&chars, i, 'h');
-                if n == 1 {
-                    out.push_str(&c.hours.to_string());
-                } else {
-                    out.push_str(&format!("{:02}", c.hours));
-                }
-                i += n;
-            }
-            // `f{n}` — fractional seconds, exactly n digits (1–7), no trimming
-            'f' => {
-                let n = run_length(&chars, i, 'f');
-                out.push_str(&fmt_frac(c.sub_sec_ticks, n, false));
-                i += n;
-            }
-            // `F{n}` — fractional seconds, up to n digits, trailing zeros trimmed
-            'F' => {
-                let n = run_length(&chars, i, 'F');
-                out.push_str(&fmt_frac(c.sub_sec_ticks, n, true));
-                i += n;
-            }
-            // `s` / `ss` — seconds component
-            's' => {
-                let n = run_length(&chars, i, 's');
-                if n == 1 {
-                    out.push_str(&c.seconds.to_string());
-                } else {
-                    out.push_str(&format!("{:02}", c.seconds));
-                }
-                i += n;
-            }
-            // `m` / `mm` — minutes component
-            'm' => {
-                let n = run_length(&chars, i, 'm');
-                if n == 1 {
-                    out.push_str(&c.minutes.to_string());
-                } else {
-                    out.push_str(&format!("{:02}", c.minutes));
-                }
-                i += n;
-            }
-            // `d{n}` — days padded to at least n digits
-            'd' => {
-                let n = run_length(&chars, i, 'd');
-                let s = c.days.to_string();
-                if s.len() < n {
-                    out.push_str(&format!("{:0>width$}", s, width = n));
-                } else {
-                    out.push_str(&s);
-                }
+            // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars
+            ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
+                let n = run_length(&chars, i, ch);
+                out.push_str(&format_specifier(c, ch, n));
                 i += n;
             }
             // `\x` — escape: next char is a literal
@@ -332,8 +278,27 @@ fn format_custom(c: &Components, fmt: &str) -> String {
     out
 }
 
-/// Format `sub_sec_ticks` (0..=9_999_999) as `n` fractional-second digits.
-/// If `trim` is true, trailing zeros are removed (uppercase `F` behaviour).
+/// Emit one component according to its specifier character and repeat count `n`.
+fn format_specifier(c: &Components, ch: char, n: usize) -> String {
+    match ch {
+        'd' => {
+            let s = c.days.to_string();
+            if s.len() < n { format!("{:0>width$}", s, width = n) } else { s }
+        }
+        'h' => fmt_component(n, c.hours),
+        'm' => fmt_component(n, c.minutes),
+        's' => fmt_component(n, c.seconds),
+        'f' => fmt_frac(c.sub_sec_ticks, n, false),
+        'F' => fmt_frac(c.sub_sec_ticks, n, true),
+        _ => todo!("unknown custom specifier: {}", ch),
+    }
+}
+
+/// `n == 1` → no leading zero; `n > 1` → zero-padded to 2 digits.
+fn fmt_component(n: usize, val: u32) -> String {
+    if n == 1 { val.to_string() } else { format!("{:02}", val) }
+}
+
 fn decimal_sep(culture: Culture) -> char {
     match culture {
         Culture::Invariant => '.',
