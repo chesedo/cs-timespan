@@ -191,6 +191,7 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                     'd' => { out.push_str(&c.days.to_string()); i += 1; }
                     'h' => { out.push_str(&c.hours.to_string()); i += 1; }
                     'm' => { out.push_str(&c.minutes.to_string()); i += 1; }
+                    's' => { out.push_str(&c.seconds.to_string()); i += 1; }
                     _ => todo!("custom specifier: %{}", chars[i]),
                 }
             }
@@ -201,6 +202,16 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                     out.push_str(&c.hours.to_string());
                 } else {
                     out.push_str(&format!("{:02}", c.hours));
+                }
+                i += n;
+            }
+            // `s` / `ss` — seconds component
+            's' => {
+                let n = run_length(&chars, i, 's');
+                if n == 1 {
+                    out.push_str(&c.seconds.to_string());
+                } else {
+                    out.push_str(&format!("{:02}", c.seconds));
                 }
                 i += n;
             }
