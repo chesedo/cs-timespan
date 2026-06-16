@@ -221,7 +221,20 @@ fn format_general_short(c: &Components, culture: Culture) -> String {
 
 /// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
 fn format_general_long(c: &Components, culture: Culture) -> String {
-    todo!("format_general_long")
+    let mut out = String::new();
+    if c.negative {
+        out.push('-');
+    }
+    out.push_str(&format!(
+        "{}:{:02}:{:02}:{:02}{}{}",
+        c.days,
+        c.hours,
+        c.minutes,
+        c.seconds,
+        decimal_sep(culture),
+        fmt_frac(c.sub_sec_ticks, 7, false),
+    ));
+    out
 }
 
 fn format_custom(c: &Components, fmt: &str) -> String {
