@@ -4,18 +4,14 @@ A Rust library whose sole intent is to be a drop-in replacement for the C# `Syst
 
 ## Implementation Progress
 
-### Construction
+### Interoperability
 
-- [ ] `TimeSpan::new(ticks: i64)` — from raw tick count (1 tick = 100 ns)
-- [ ] `TimeSpan::from_hms(hours, minutes, seconds)` — from hours, minutes, seconds
-- [ ] `TimeSpan::from_dhms(days, hours, minutes, seconds)` — from days, hours, minutes, seconds
-- [ ] `TimeSpan::from_dhmsm(days, hours, minutes, seconds, milliseconds)` — from days through milliseconds
-- [ ] `TimeSpan::from_ticks(ticks: i64)` — factory equivalent of `TimeSpan.FromTicks`
-- [ ] `TimeSpan::from_milliseconds(value: f64)`
-- [ ] `TimeSpan::from_seconds(value: f64)`
-- [ ] `TimeSpan::from_minutes(value: f64)`
-- [ ] `TimeSpan::from_hours(value: f64)`
-- [ ] `TimeSpan::from_days(value: f64)`
+> Construction of time intervals is intentionally delegated to [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html). `std::time::Duration` is unsigned and cannot represent negative intervals; `chrono::TimeDelta` supports negative values and is the closer equivalent to `System.TimeSpan`. Use whichever suits your project, then convert into this crate's types for parsing/formatting.
+
+- [ ] `From<chrono::TimeDelta>` for `TimeSpan`
+- [ ] `From<TimeSpan>` for `chrono::TimeDelta`
+- [ ] `From<std::time::Duration>` for `TimeSpan` (always succeeds — `Duration` is unsigned)
+- [ ] `TryFrom<TimeSpan>` for `std::time::Duration` (fails if the interval is negative)
 
 ### Constants
 
