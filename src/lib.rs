@@ -250,6 +250,21 @@ fn format_custom(c: &Components, fmt: &str) -> String {
                 }
                 i += n;
             }
+            // `\x` — escape: next char is a literal
+            '\\' if i + 1 < chars.len() => {
+                out.push(chars[i + 1]);
+                i += 2;
+            }
+            // `'...'` or `"..."` — quoted literal string
+            '\'' | '"' => {
+                let q = chars[i];
+                i += 1;
+                while i < chars.len() && chars[i] != q {
+                    out.push(chars[i]);
+                    i += 1;
+                }
+                i += 1; // skip closing quote
+            }
             _ => todo!("custom format char: {:?}", chars[i]),
         }
     }
