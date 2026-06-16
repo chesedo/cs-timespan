@@ -536,6 +536,7 @@ mod parse_impl {
             return Err(ParseError::InvalidFormat);
         }
 
+        // Strip optional "d." prefix (dot must come before the first colon).
         let first_colon = s.find(':').unwrap();
         let (days, s) = if let Some(dot) = s[..first_colon].find('.') {
             (parse_uint(&s[..dot])?, &s[dot + 1..])
@@ -543,17 +544,11 @@ mod parse_impl {
             (0u64, s)
         };
 
-        let c1 = s.find(':').unwrap();
-        let c2 = s[c1 + 1..].find(':').unwrap() + c1 + 1;
-        let (sv_s, frac) = if let Some(dot) = s[c2 + 1..].find('.') {
-            (&s[c2 + 1..c2 + 1 + dot], parse_frac(&s[c2 + 2 + dot..])?)
-        } else {
-            (&s[c2 + 1..], 0u32)
-        };
-
-        let h = parse_uint(&s[..c1])? as u32;
-        let m = parse_uint(&s[c1 + 1..c2])? as u32;
-        let sv = parse_uint(sv_s)? as u32;
+        // s is now "hh:mm:ss[.fffffff]" — exactly 2 colons remain.
+        let parts: Vec<&str> = s.splitn(3, ':').collect();
+        let h = parse_uint(parts[0])? as u32;
+        let m = parse_uint(parts[1])? as u32;
+        let (sv, frac) = last_with_frac(parts[2], '.')?;
         if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
         build(neg, days, h, m, sv, frac)
     }
