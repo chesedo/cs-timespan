@@ -82,28 +82,42 @@ impl TimeSpan {
     }
 
     // ── Strict parsing (mirrors ParseExact / TryParseExact) ───────────────────
-    pub fn parse_exact(s: &str, _fmt: &str) -> Result<Self, ParseError> {
-        todo!()
+    pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
+        parse_impl::parse_exact(s, fmt, Culture::Invariant)
     }
 
-    pub fn parse_exact_any(s: &str, _formats: &[&str]) -> Result<Self, ParseError> {
-        todo!()
+    pub fn parse_exact_any(s: &str, formats: &[&str]) -> Result<Self, ParseError> {
+        let mut last = ParseError::InvalidFormat;
+        for fmt in formats {
+            match Self::parse_exact(s, fmt) {
+                Ok(ts) => return Ok(ts),
+                Err(e) => last = e,
+            }
+        }
+        Err(last)
     }
 
     pub fn parse_exact_with_culture(
         s: &str,
-        _fmt: &str,
-        _culture: Culture,
+        fmt: &str,
+        culture: Culture,
     ) -> Result<Self, ParseError> {
-        todo!()
+        parse_impl::parse_exact(s, fmt, culture)
     }
 
     pub fn parse_exact_any_with_culture(
         s: &str,
-        _formats: &[&str],
-        _culture: Culture,
+        formats: &[&str],
+        culture: Culture,
     ) -> Result<Self, ParseError> {
-        todo!()
+        let mut last = ParseError::InvalidFormat;
+        for fmt in formats {
+            match Self::parse_exact_with_culture(s, fmt, culture) {
+                Ok(ts) => return Ok(ts),
+                Err(e) => last = e,
+            }
+        }
+        Err(last)
     }
 
     pub fn parse_exact_with_styles(
@@ -115,12 +129,12 @@ impl TimeSpan {
         todo!()
     }
 
-    pub fn try_parse_exact(s: &str, _fmt: &str) -> Option<Self> {
-        todo!()
+    pub fn try_parse_exact(s: &str, fmt: &str) -> Option<Self> {
+        Self::parse_exact(s, fmt).ok()
     }
 
-    pub fn try_parse_exact_any(s: &str, _formats: &[&str]) -> Option<Self> {
-        todo!()
+    pub fn try_parse_exact_any(s: &str, formats: &[&str]) -> Option<Self> {
+        Self::parse_exact_any(s, formats).ok()
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────────
@@ -501,6 +515,242 @@ mod parse_impl {
         };
 
         build(neg, d, h, m, sv, frac)
+    }
+
+    // ── parse_exact ───────────────────────────────────────────────────────────
+
+    pub fn parse_exact(s: &str, fmt: &str, _culture: Culture) -> Result<TimeSpan, ParseError> {
+        match fmt {
+            "c" | "t" | "T" => parse_constant(s),
+            "g" => parse_g(s),
+            "G" => parse_g_upper(s),
+            "" => Err(ParseError::InvalidFormat),
+            _ => parse_custom(s, fmt),
+        }
+    }
+
+    fn strip_neg(s: &str) -> (bool, &str) {
+        if let Some(r) = s.strip_prefix('-') { (true, r) } else { (false, s) }
+    }
+
+    /// "c"/"t"/"T": `[-][d.]hh:mm:ss[.fffffff]`
+    fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
+        if s.trim().is_empty() { return Err(ParseError::InvalidFormat); }
+        let (neg, s) = strip_neg(s.trim());
+        if s.is_empty() { return Err(ParseError::InvalidFormat); }
+
+        if s.bytes().filter(|&b| b == b':').count() != 2 {
+            return Err(ParseError::InvalidFormat);
+        }
+
+        let first_colon = s.find(':').unwrap();
+        let (days, s) = if let Some(dot) = s[..first_colon].find('.') {
+            (parse_uint(&s[..dot])?, &s[dot + 1..])
+        } else {
+            (0u64, s)
+        };
+
+        let c1 = s.find(':').unwrap();
+        let c2 = s[c1 + 1..].find(':').unwrap() + c1 + 1;
+        let (sv_s, frac) = if let Some(dot) = s[c2 + 1..].find('.') {
+            (&s[c2 + 1..c2 + 1 + dot], parse_frac(&s[c2 + 2 + dot..])?)
+        } else {
+            (&s[c2 + 1..], 0u32)
+        };
+
+        let h = parse_uint(&s[..c1])? as u32;
+        let m = parse_uint(&s[c1 + 1..c2])? as u32;
+        let sv = parse_uint(sv_s)? as u32;
+        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+        build(neg, days, h, m, sv, frac)
+    }
+
+    /// "g": `[-][d:]h:mm:ss[.FFFFFFF]`
+    fn parse_g(s: &str) -> Result<TimeSpan, ParseError> {
+        if s.trim().is_empty() { return Err(ParseError::InvalidFormat); }
+        let (neg, s) = strip_neg(s.trim());
+        if s.is_empty() { return Err(ParseError::InvalidFormat); }
+
+        // Dot before any colon would be days separator — invalid for "g".
+        let first_colon = s.find(':');
+        if let Some(dot) = s.find('.') {
+            if first_colon.map_or(true, |c| dot < c) {
+                return Err(ParseError::InvalidFormat);
+            }
+        }
+
+        let n_colons = s.bytes().filter(|&b| b == b':').count();
+        let parts: Vec<&str> = s.splitn(n_colons + 1, ':').collect();
+
+        match n_colons {
+            0 => build(neg, parse_uint(parts[0])?, 0, 0, 0, 0),
+            1 => {
+                let h = parse_uint(parts[0])? as u32;
+                let m = parse_uint(parts[1])? as u32;
+                if h >= 24 || m >= 60 { return Err(ParseError::Overflow); }
+                build(neg, 0, h, m, 0, 0)
+            }
+            2 => {
+                let h = parse_uint(parts[0])? as u32;
+                let m = parse_uint(parts[1])? as u32;
+                let (sv, frac) = last_with_frac(parts[2], '.')?;
+                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+                build(neg, 0, h, m, sv, frac)
+            }
+            3 => {
+                let d = parse_uint(parts[0])?;
+                let h = parse_uint(parts[1])? as u32;
+                let m = parse_uint(parts[2])? as u32;
+                let (sv, frac) = last_with_frac(parts[3], '.')?;
+                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+                build(neg, d, h, m, sv, frac)
+            }
+            _ => Err(ParseError::InvalidFormat),
+        }
+    }
+
+    /// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
+    fn parse_g_upper(s: &str) -> Result<TimeSpan, ParseError> {
+        if s.trim().is_empty() { return Err(ParseError::InvalidFormat); }
+        let (neg, s) = strip_neg(s.trim());
+        if s.is_empty() { return Err(ParseError::InvalidFormat); }
+
+        if s.bytes().filter(|&b| b == b':').count() != 3 {
+            return Err(ParseError::InvalidFormat);
+        }
+
+        let parts: Vec<&str> = s.splitn(4, ':').collect();
+        let d = parse_uint(parts[0])?;
+        let h = parse_uint(parts[1])? as u32;
+        let m = parse_uint(parts[2])? as u32;
+        let dot = parts[3].find('.').ok_or(ParseError::InvalidFormat)?;
+        let sv = parse_uint(&parts[3][..dot])? as u32;
+        let frac = parse_frac(&parts[3][dot + 1..])?;
+
+        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+        build(neg, d, h, m, sv, frac)
+    }
+
+    /// Custom format specifier parsing.
+    fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
+        let fmt_chars: Vec<char> = fmt.chars().collect();
+        let mut inp = input;
+        let mut fi = 0;
+        let mut days: Option<u64> = None;
+        let mut hours: Option<u32> = None;
+        let mut minutes: Option<u32> = None;
+        let mut seconds: Option<u32> = None;
+        let mut frac: Option<u32> = None;
+
+        while fi < fmt_chars.len() {
+            match fmt_chars[fi] {
+                '%' if fi + 1 < fmt_chars.len() => {
+                    fi += 1;
+                    let ch = fmt_chars[fi];
+                    fi += 1;
+                    apply_spec(ch, 1, inp, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                }
+                '%' => return Err(ParseError::InvalidFormat),
+                ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
+                    let n = fmt_chars[fi..].iter().take_while(|&&c| c == ch).count();
+                    fi += n;
+                    let max = match ch { 'd' => 8, 'h' | 'm' | 's' => 2, _ => 7 };
+                    if n > max { return Err(ParseError::InvalidFormat); }
+                    apply_spec(ch, n, inp, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                }
+                '\\' if fi + 1 < fmt_chars.len() => {
+                    fi += 1;
+                    let expected = fmt_chars[fi];
+                    fi += 1;
+                    let ch = inp.chars().next().ok_or(ParseError::InvalidFormat)?;
+                    if ch != expected { return Err(ParseError::InvalidFormat); }
+                    inp = &inp[ch.len_utf8()..];
+                }
+                '\'' | '"' => {
+                    let q = fmt_chars[fi];
+                    fi += 1;
+                    let start = fi;
+                    while fi < fmt_chars.len() && fmt_chars[fi] != q { fi += 1; }
+                    if fi >= fmt_chars.len() { return Err(ParseError::InvalidFormat); }
+                    let lit: String = fmt_chars[start..fi].iter().collect();
+                    fi += 1;
+                    if !inp.starts_with(lit.as_str()) { return Err(ParseError::InvalidFormat); }
+                    inp = &inp[lit.len()..];
+                }
+                _ => return Err(ParseError::InvalidFormat),
+            }
+        }
+
+        if !inp.is_empty() { return Err(ParseError::InvalidFormat); }
+        let h = hours.unwrap_or(0);
+        let m = minutes.unwrap_or(0);
+        let sv = seconds.unwrap_or(0);
+        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+        build(false, days.unwrap_or(0), h, m, sv, frac.unwrap_or(0))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn apply_spec<'a>(
+        ch: char, n: usize,
+        inp: &'a str, inp_out: &mut &'a str,
+        days: &mut Option<u64>, hours: &mut Option<u32>,
+        minutes: &mut Option<u32>, seconds: &mut Option<u32>,
+        frac: &mut Option<u32>,
+    ) -> Result<(), ParseError> {
+        macro_rules! dup { ($s:expr) => { if $s.is_some() { return Err(ParseError::InvalidFormat); } }; }
+        match ch {
+            'd' => { dup!(days);    let v = if n == 1 { rd_grdy(inp, inp_out, 8)? } else { rd_exact(inp, inp_out, n)? }; *days = Some(v); }
+            'h' => { dup!(hours);   let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *hours = Some(v as u32); }
+            'm' => { dup!(minutes); let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *minutes = Some(v as u32); }
+            's' => { dup!(seconds); let v = if n == 1 { rd_grdy(inp, inp_out, 2)? } else { rd_exact(inp, inp_out, n)? }; *seconds = Some(v as u32); }
+            'f' | 'F' => {
+                dup!(frac);
+                let v = rd_frac(inp, inp_out, n, ch == 'F')?;
+                *frac = Some(v);
+            }
+            _ => return Err(ParseError::InvalidFormat),
+        }
+        Ok(())
+    }
+
+    fn rd_grdy<'a>(inp: &'a str, out: &mut &'a str, max: usize) -> Result<u64, ParseError> {
+        let n = inp.bytes().take(max).take_while(|b| b.is_ascii_digit()).count();
+        if n == 0 { return Err(ParseError::InvalidFormat); }
+        let s = &inp[..n];
+        *out = &inp[n..];
+        s.parse::<u64>().map_err(|_| ParseError::Overflow)
+    }
+
+    fn rd_exact<'a>(inp: &'a str, out: &mut &'a str, n: usize) -> Result<u64, ParseError> {
+        if inp.len() < n || !inp[..n].bytes().all(|b| b.is_ascii_digit()) {
+            return Err(ParseError::InvalidFormat);
+        }
+        let s = &inp[..n];
+        *out = &inp[n..];
+        s.parse::<u64>().map_err(|_| ParseError::Overflow)
+    }
+
+    fn rd_frac<'a>(inp: &'a str, out: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
+        if greedy {
+            let count = inp.bytes().take(n).take_while(|b| b.is_ascii_digit()).count();
+            if count == 0 { return Err(ParseError::InvalidFormat); }
+            let v = inp[..count].parse::<u32>().unwrap();
+            *out = &inp[count..];
+            Ok(v * 10u32.pow(7 - count as u32))
+        } else {
+            rd_exact(inp, out, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
+        }
+    }
+
+    fn last_with_frac(s: &str, sep: char) -> Result<(u32, u32), ParseError> {
+        if let Some(dot) = s.find(sep) {
+            let int_s = &s[..dot];
+            let sv = if int_s.is_empty() { 0u32 } else { parse_uint(int_s)? as u32 };
+            Ok((sv, parse_frac(&s[dot + 1..])?))
+        } else {
+            if s.is_empty() { return Err(ParseError::InvalidFormat); }
+            Ok((parse_uint(s)? as u32, 0))
+        }
     }
 }
 
