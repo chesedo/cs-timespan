@@ -172,9 +172,42 @@ struct Components {
     sub_sec_ticks: u32,
 }
 
-fn format_timespan(ts: TimeSpan, fmt: &str, _culture: Culture) -> String {
+fn format_timespan(ts: TimeSpan, fmt: &str, culture: Culture) -> String {
     let c = ts.to_components();
-    format_custom(&c, fmt)
+    match fmt {
+        "c" | "t" | "T" => format_constant(&c),
+        "g" => format_general_short(&c, culture),
+        "G" => format_general_long(&c, culture),
+        _ => format_custom(&c, fmt),
+    }
+}
+
+/// `"c"` / `"t"` / `"T"`: `[-][d.]hh:mm:ss[.fffffff]` — culture-invariant.
+fn format_constant(c: &Components) -> String {
+    let mut out = String::new();
+    if c.negative {
+        out.push('-');
+    }
+    if c.days > 0 {
+        out.push_str(&c.days.to_string());
+        out.push('.');
+    }
+    out.push_str(&format!("{:02}:{:02}:{:02}", c.hours, c.minutes, c.seconds));
+    if c.sub_sec_ticks > 0 {
+        out.push('.');
+        out.push_str(&format!("{:07}", c.sub_sec_ticks));
+    }
+    out
+}
+
+/// `"g"`: `[-][d:]h:mm:ss[.FFFFFFF]` — culture-sensitive decimal separator.
+fn format_general_short(c: &Components, culture: Culture) -> String {
+    todo!("format_general_short")
+}
+
+/// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
+fn format_general_long(c: &Components, culture: Culture) -> String {
+    todo!("format_general_long")
 }
 
 fn format_custom(c: &Components, fmt: &str) -> String {
