@@ -124,12 +124,32 @@ impl TimeSpan {
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────────
-    pub fn to_string_fmt(&self, _fmt: &str) -> String {
-        todo!()
+    pub fn to_string_fmt(&self, fmt: &str) -> String {
+        format_timespan(*self, fmt, Culture::Invariant)
     }
 
-    pub fn to_string_fmt_with_culture(&self, _fmt: &str, _culture: Culture) -> String {
-        todo!()
+    pub fn to_string_fmt_with_culture(&self, fmt: &str, culture: Culture) -> String {
+        format_timespan(*self, fmt, culture)
+    }
+
+    fn to_components(self) -> Components {
+        let abs = self.ticks.unsigned_abs();
+        let days = abs / Self::TICKS_PER_DAY as u64;
+        let r = abs % Self::TICKS_PER_DAY as u64;
+        let hours = (r / Self::TICKS_PER_HOUR as u64) as u32;
+        let r = r % Self::TICKS_PER_HOUR as u64;
+        let minutes = (r / Self::TICKS_PER_MINUTE as u64) as u32;
+        let r = r % Self::TICKS_PER_MINUTE as u64;
+        let seconds = (r / Self::TICKS_PER_SECOND as u64) as u32;
+        let sub_sec_ticks = (r % Self::TICKS_PER_SECOND as u64) as u32;
+        Components {
+            negative: self.ticks < 0,
+            days,
+            hours,
+            minutes,
+            seconds,
+            sub_sec_ticks,
+        }
     }
 }
 
@@ -138,6 +158,45 @@ impl std::fmt::Display for TimeSpan {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
+}
+
+// ── Internal formatting helpers ────────────────────────────────────────────────
+
+struct Components {
+    negative: bool,
+    days: u64,
+    hours: u32,
+    minutes: u32,
+    seconds: u32,
+    /// Fractional-second ticks: 0..=9_999_999 (one tick = 100 ns)
+    sub_sec_ticks: u32,
+}
+
+fn format_timespan(ts: TimeSpan, fmt: &str, _culture: Culture) -> String {
+    let c = ts.to_components();
+    format_custom(&c, fmt)
+}
+
+fn format_custom(c: &Components, fmt: &str) -> String {
+    let chars: Vec<char> = fmt.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+
+    while i < chars.len() {
+        match chars[i] {
+            // `%x` — single specifier written with explicit percent
+            '%' if i + 1 < chars.len() => {
+                i += 1;
+                match chars[i] {
+                    'd' => { out.push_str(&c.days.to_string()); i += 1; }
+                    _ => todo!("custom specifier: %{}", chars[i]),
+                }
+            }
+            _ => todo!("custom format char: {:?}", chars[i]),
+        }
+    }
+
+    out
 }
 
 #[cfg(feature = "chrono")]
