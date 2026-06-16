@@ -202,7 +202,21 @@ fn format_constant(c: &Components) -> String {
 
 /// `"g"`: `[-][d:]h:mm:ss[.FFFFFFF]` — culture-sensitive decimal separator.
 fn format_general_short(c: &Components, culture: Culture) -> String {
-    todo!("format_general_short")
+    let mut out = String::new();
+    if c.negative {
+        out.push('-');
+    }
+    if c.days > 0 {
+        out.push_str(&c.days.to_string());
+        out.push(':');
+    }
+    out.push_str(&format!("{}:{:02}:{:02}", c.hours, c.minutes, c.seconds));
+    if c.sub_sec_ticks > 0 {
+        out.push(decimal_sep(culture));
+        // FFFFFFF — trim trailing zeros
+        out.push_str(&fmt_frac(c.sub_sec_ticks, 7, true));
+    }
+    out
 }
 
 /// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
@@ -307,6 +321,13 @@ fn format_custom(c: &Components, fmt: &str) -> String {
 
 /// Format `sub_sec_ticks` (0..=9_999_999) as `n` fractional-second digits.
 /// If `trim` is true, trailing zeros are removed (uppercase `F` behaviour).
+fn decimal_sep(culture: Culture) -> char {
+    match culture {
+        Culture::Invariant => '.',
+        Culture::HrHR | Culture::FrFR => ',',
+    }
+}
+
 fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
     // Full 7-digit string, zero-padded
     let full = format!("{:07}", sub_sec_ticks);
