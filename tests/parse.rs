@@ -13,6 +13,28 @@
 
 use cs_timespan::{Culture, ParseError, TimeSpan};
 
+// ── en-US behaves identically to Invariant (both use '.' as decimal separator) ─
+
+#[test]
+fn parse_en_us_same_as_invariant() {
+    assert_eq!(
+        TimeSpan::parse_with_culture("12:24:02.01", Culture::EnUS),
+        Ok(ts5(0, 12, 24, 2, 10)),
+    );
+    assert_eq!(
+        TimeSpan::parse_with_culture("1.12:24:02.999", Culture::EnUS),
+        Ok(ts5(1, 12, 24, 2, 999)),
+    );
+}
+
+#[test]
+fn parse_en_us_rejects_comma_separator() {
+    assert_eq!(
+        TimeSpan::parse_with_culture("6:12:14:45,348", Culture::EnUS),
+        Err(ParseError::InvalidFormat),
+    );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn ts3(h: i64, m: i64, s: i64) -> TimeSpan {

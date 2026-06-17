@@ -125,10 +125,13 @@ fn format_custom_composite_dd_dot_ss() {
 #[test]
 fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     // Custom format specifiers are not culture-sensitive
-    assert_eq!(
-        input().to_string_fmt_with_culture(r"dd\.ss", Culture::FrFR),
-        "142.18",
-    );
+    for culture in [Culture::Invariant, Culture::EnUS, Culture::FrFR, Culture::HrHR] {
+        assert_eq!(
+            input().to_string_fmt_with_culture(r"dd\.ss", culture),
+            "142.18",
+            "culture={culture:?}",
+        );
+    }
 }
 
 #[test]
@@ -247,7 +250,7 @@ fn format_constant_dhmsm() {
 fn format_constant_is_culture_invariant() {
     // "c"/"t"/"T" output must not change with culture
     for fmt in ["c", "t", "T"] {
-        for culture in [Culture::Invariant, Culture::FrFR] {
+        for culture in [Culture::Invariant, Culture::EnUS, Culture::FrFR, Culture::HrHR] {
             assert_eq!(
                 input().to_string_fmt_with_culture(fmt, culture),
                 "142.21:21:18.9101112",

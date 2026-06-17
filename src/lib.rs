@@ -50,6 +50,8 @@ pub enum Culture {
     /// `CultureInfo.InvariantCulture` — decimal separator is `.`
     #[default]
     Invariant,
+    /// English, United States (`en-US`) — decimal separator is `.`
+    EnUS,
     /// Croatian (`hr-HR`) — decimal separator is `,`
     HrHR,
     /// French (`fr-FR`) — decimal separator is `,`
@@ -334,7 +336,7 @@ fn fmt_component(n: usize, val: u32) -> String {
 
 fn decimal_sep(culture: Culture) -> char {
     match culture {
-        Culture::Invariant => '.',
+        Culture::Invariant | Culture::EnUS => '.',
         Culture::HrHR | Culture::FrFR => ',',
     }
 }
