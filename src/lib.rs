@@ -122,11 +122,16 @@ impl TimeSpan {
 
     pub fn parse_exact_with_styles(
         s: &str,
-        _fmt: &str,
-        _culture: Culture,
-        _styles: TimeSpanStyles,
+        fmt: &str,
+        culture: Culture,
+        styles: TimeSpanStyles,
     ) -> Result<Self, ParseError> {
-        todo!()
+        let ts = parse_impl::parse_exact(s, fmt, culture)?;
+        if styles == TimeSpanStyles::AssumeNegative && ts.ticks > 0 {
+            Ok(TimeSpan::from_ticks(-ts.ticks))
+        } else {
+            Ok(ts)
+        }
     }
 
     pub fn try_parse_exact(s: &str, fmt: &str) -> Option<Self> {
