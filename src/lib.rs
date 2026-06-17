@@ -780,7 +780,13 @@ impl From<std::time::Duration> for TimeSpan {
 impl TryFrom<TimeSpan> for std::time::Duration {
     type Error = ();
 
-    fn try_from(_ts: TimeSpan) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(ts: TimeSpan) -> Result<Self, Self::Error> {
+        if ts.ticks < 0 {
+            return Err(());
+        }
+        let nanos = ts.ticks as u128 * 100;
+        let secs = (nanos / 1_000_000_000) as u64;
+        let subsec_nanos = (nanos % 1_000_000_000) as u32;
+        Ok(std::time::Duration::new(secs, subsec_nanos))
     }
 }
