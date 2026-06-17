@@ -1,4 +1,4 @@
-use cs_timespan::TimeSpan;
+use cs_timespan::{NegativeTimeSpan, TimeSpan};
 
 // ── From<std::time::Duration> for TimeSpan ────────────────────────────────────
 
@@ -59,8 +59,14 @@ fn try_from_timespan_positive() {
 
 #[test]
 fn try_from_timespan_negative_is_err() {
-    assert!(std::time::Duration::try_from(TimeSpan::from_ticks(-1)).is_err());
-    assert!(std::time::Duration::try_from(TimeSpan::MIN_VALUE).is_err());
+    assert_eq!(
+        std::time::Duration::try_from(TimeSpan::from_ticks(-1)),
+        Err(NegativeTimeSpan),
+    );
+    assert_eq!(
+        std::time::Duration::try_from(TimeSpan::MIN_VALUE),
+        Err(NegativeTimeSpan),
+    );
 }
 
 #[test]

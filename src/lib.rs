@@ -7,6 +7,20 @@ pub struct TimeSpan {
     ticks: i64,
 }
 
+/// Error returned when a negative [`TimeSpan`] is converted to [`std::time::Duration`].
+///
+/// `std::time::Duration` is unsigned; negative intervals have no representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NegativeTimeSpan;
+
+impl std::fmt::Display for NegativeTimeSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("cannot convert negative TimeSpan to Duration")
+    }
+}
+
+impl std::error::Error for NegativeTimeSpan {}
+
 /// Mirrors the two distinct failure modes C# separates into
 /// `FormatException` (bad syntax) and `OverflowException` (out of range).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -786,11 +800,11 @@ impl From<std::time::Duration> for TimeSpan {
 }
 
 impl TryFrom<TimeSpan> for std::time::Duration {
-    type Error = ();
+    type Error = NegativeTimeSpan;
 
     fn try_from(ts: TimeSpan) -> Result<Self, Self::Error> {
         if ts.ticks < 0 {
-            return Err(());
+            return Err(NegativeTimeSpan);
         }
         let nanos = ts.ticks as u128 * 100;
         let secs = (nanos / 1_000_000_000) as u64;
