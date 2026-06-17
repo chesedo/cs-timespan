@@ -753,14 +753,22 @@ mod chrono_impls {
     use chrono::TimeDelta;
 
     impl From<TimeDelta> for TimeSpan {
-        fn from(_delta: TimeDelta) -> Self {
-            todo!()
+        fn from(delta: TimeDelta) -> Self {
+            // num_seconds() and subsec_nanos() together give signed components.
+            // For e.g. -1.5 s: num_seconds()=-1, subsec_nanos()=-500_000_000.
+            let secs = delta.num_seconds();
+            let nanos = delta.subsec_nanos() as i64;
+            TimeSpan::from_ticks(secs * TimeSpan::TICKS_PER_SECOND + nanos / 100)
         }
     }
 
     impl From<TimeSpan> for TimeDelta {
-        fn from(_ts: TimeSpan) -> Self {
-            todo!()
+        fn from(ts: TimeSpan) -> Self {
+            // TimeSpan's range (±29 k years) is contained within TimeDelta's range
+            // (±292 billion years), so no saturation is needed.
+            let secs = ts.ticks / TimeSpan::TICKS_PER_SECOND;
+            let subsec_nanos = (ts.ticks % TimeSpan::TICKS_PER_SECOND) * 100;
+            TimeDelta::seconds(secs) + TimeDelta::nanoseconds(subsec_nanos)
         }
     }
 }
