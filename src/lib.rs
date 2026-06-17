@@ -766,8 +766,14 @@ mod chrono_impls {
 }
 
 impl From<std::time::Duration> for TimeSpan {
-    fn from(_d: std::time::Duration) -> Self {
-        todo!()
+    fn from(d: std::time::Duration) -> Self {
+        // 1 tick = 100 ns; saturate to MAX_VALUE if Duration exceeds TimeSpan's range.
+        let ticks = d.as_nanos() / 100;
+        if ticks > i64::MAX as u128 {
+            TimeSpan::MAX_VALUE
+        } else {
+            TimeSpan::from_ticks(ticks as i64)
+        }
     }
 }
 
