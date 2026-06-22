@@ -1,3 +1,5 @@
+use std::fmt::Write as FmtWrite;
+
 pub use num_format::Locale;
 
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
@@ -279,7 +281,7 @@ fn format_timespan(ts: TimeSpan, fmt: &str, sep: char) -> String {
 
 /// `"c"` / `"t"` / `"T"`: `[-][d.]hh:mm:ss[.fffffff]` — culture-invariant.
 fn format_constant(c: &Components) -> String {
-    use std::fmt::Write;
+
     let mut out = String::new();
     if c.negative { out.push('-'); }
     if c.days > 0 { write!(out, "{}.", c.days).unwrap(); }
@@ -290,7 +292,7 @@ fn format_constant(c: &Components) -> String {
 
 /// `"g"`: `[-][d:]h:mm:ss[.FFFFFFF]` — culture-sensitive decimal separator.
 fn format_general_short(c: &Components, sep: char) -> String {
-    use std::fmt::Write;
+
     let mut out = String::new();
     if c.negative { out.push('-'); }
     if c.days > 0 { write!(out, "{}:", c.days).unwrap(); }
@@ -304,7 +306,7 @@ fn format_general_short(c: &Components, sep: char) -> String {
 
 /// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
 fn format_general_long(c: &Components, sep: char) -> String {
-    use std::fmt::Write;
+
     let mut out = String::new();
     if c.negative { out.push('-'); }
     write!(
@@ -358,7 +360,7 @@ fn format_custom(c: &Components, fmt: &str) -> String {
 
 /// Emit one component according to its specifier character and repeat count `n`.
 fn format_specifier(c: &Components, ch: char, n: usize) -> String {
-    use std::fmt::Write;
+
     match ch {
         'd' => {
             let s = c.days.to_string();
@@ -381,7 +383,7 @@ fn format_specifier(c: &Components, ch: char, n: usize) -> String {
 
 /// `n == 1` → no leading zero; `n > 1` → zero-padded to 2 digits.
 fn fmt_component(n: usize, val: u32) -> String {
-    use std::fmt::Write;
+
     let mut out = String::new();
     if n == 1 { write!(out, "{}", val).unwrap(); } else { write!(out, "{:02}", val).unwrap(); }
     out
@@ -392,7 +394,7 @@ fn decimal_sep(locale: Locale) -> char {
 }
 
 fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
-    use std::fmt::Write;
+
     let mut full = String::new();
     write!(full, "{:07}", sub_sec_ticks).unwrap();
     let s = &full[..n];
