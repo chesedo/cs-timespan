@@ -67,9 +67,10 @@ fn bench_format_custom(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(2))
-        .warm_up_time(Duration::from_millis(500))
-        .sample_size(50);
+        .measurement_time(Duration::from_secs(5))
+        .warm_up_time(Duration::from_secs(1))
+        .sample_size(100)
+        .noise_threshold(0.10);
     targets =
         bench_format_constant,
         bench_format_display,

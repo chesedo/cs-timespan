@@ -3,6 +3,9 @@ name = "cs-timespan"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+bench = false
+
 [features]
 default = []
 chrono = ["dep:chrono"]
