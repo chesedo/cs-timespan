@@ -56,6 +56,8 @@ pub enum Culture {
     HrHR,
     /// French (`fr-FR`) — decimal separator is `,`
     FrFR,
+    /// Any other culture not listed above — decimal separator defaults to `.`
+    Other,
 }
 
 impl TimeSpan {
@@ -336,7 +338,7 @@ fn fmt_component(n: usize, val: u32) -> String {
 
 fn decimal_sep(culture: Culture) -> char {
     match culture {
-        Culture::Invariant | Culture::EnUS => '.',
+        Culture::Invariant | Culture::EnUS | Culture::Other => '.',
         Culture::HrHR | Culture::FrFR => ',',
     }
 }
