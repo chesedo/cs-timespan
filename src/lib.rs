@@ -4,6 +4,26 @@ pub use num_format::Locale;
 ///
 /// Internally stores a tick count where 1 tick = 100 nanoseconds,
 /// matching the C# representation exactly.
+///
+/// # Examples
+///
+/// ```
+/// use cs_timespan::TimeSpan;
+///
+/// // Parse the constant "c" format
+/// let ts = TimeSpan::parse("1.02:03:04.5678900").unwrap();
+/// assert_eq!(ts.ticks(), 937_845_678_900);
+///
+/// // Round-trip through Display (which also uses the "c" format)
+/// assert_eq!(ts.to_string(), "1.02:03:04.5678900");
+///
+/// // Use a locale-sensitive format with a French locale (comma separator)
+/// use cs_timespan::Locale;
+/// assert_eq!(
+///     ts.to_string_fmt_with_culture("g", Locale::fr),
+///     "1:2:03:04,56789",
+/// );
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TimeSpan {
     ticks: i64,
@@ -58,27 +78,69 @@ impl TimeSpan {
     pub const MIN_VALUE: TimeSpan = TimeSpan { ticks: i64::MIN };
 
     // ── Raw construction ───────────────────────────────────────────────────────
+    /// Creates a `TimeSpan` from a raw tick count (1 tick = 100 ns).
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// let one_second = TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND);
+    /// assert_eq!(one_second.to_string(), "00:00:01");
+    /// ```
     pub const fn from_ticks(ticks: i64) -> Self {
         TimeSpan { ticks }
     }
 
+    /// Returns the total number of ticks (1 tick = 100 ns).
     pub const fn ticks(self) -> i64 {
         self.ticks
     }
 
     // ── Lenient parsing (mirrors Parse / TryParse) ─────────────────────────────
+    /// Parses a time interval string using the invariant culture (`.` decimal separator).
+    ///
+    /// Accepts the same flexible formats as C# `TimeSpan.Parse`: `h:mm`,
+    /// `h:mm:ss`, `d.hh:mm:ss`, `d:h:mm:ss`, with optional fractional seconds.
+    ///
+    /// ```
+    /// use cs_timespan::{ParseError, TimeSpan};
+    ///
+    /// assert_eq!(TimeSpan::parse("1:02:03").unwrap().ticks(), 37_230_000_000);
+    /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().ticks(), 937_840_000_000);
+    ///
+    /// // Leading/trailing whitespace is accepted
+    /// assert!(TimeSpan::parse("  01:30:00  ").is_ok());
+    ///
+    /// // Bad syntax → InvalidFormat; value out of range → Overflow
+    /// assert_eq!(TimeSpan::parse("garbage"), Err(ParseError::InvalidFormat));
+    /// assert_eq!(TimeSpan::parse("00:00:60"), Err(ParseError::Overflow));
+    /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         parse_impl::parse_lenient(s, '.')
     }
 
+    /// Parses using the decimal separator of the given locale.
+    ///
+    /// ```
+    /// use cs_timespan::{ParseError, TimeSpan, Locale};
+    ///
+    /// // Croatian locale uses ',' as the decimal separator
+    /// assert!(TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr).is_ok());
+    ///
+    /// // A '.' separator is invalid for that locale
+    /// assert_eq!(
+    ///     TimeSpan::parse_with_culture("6:12:14:45.348", Locale::hr),
+    ///     Err(ParseError::InvalidFormat),
+    /// );
+    /// ```
     pub fn parse_with_culture(s: &str, locale: Locale) -> Result<Self, ParseError> {
         parse_impl::parse_lenient(s, decimal_sep(locale))
     }
 
+    /// Returns `None` instead of an error when parsing fails.
     pub fn try_parse(s: &str) -> Option<Self> {
         Self::parse(s).ok()
     }
 
+    /// Returns `None` instead of an error when parsing fails.
     pub fn try_parse_with_culture(s: &str, locale: Locale) -> Option<Self> {
         Self::parse_with_culture(s, locale).ok()
     }
@@ -145,10 +207,40 @@ impl TimeSpan {
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────────
+    /// Formats the time span using a format string with the invariant `.` separator.
+    ///
+    /// Standard specifiers: `"c"`/`"t"`/`"T"` (constant), `"g"` (general short),
+    /// `"G"` (general long). Custom specifiers: `d`, `h`, `m`, `s`, `f`/`F`
+    /// for fractional seconds, `%x` for a single specifier, `\x` for a literal.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// let ts = TimeSpan::from_ticks(1_234_567_890_123);
+    ///
+    /// assert_eq!(ts.to_string_fmt("c"),          "1.10:17:36.7890123");
+    /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm"), "1.10:17");
+    /// assert_eq!(ts.to_string_fmt("hh"),         "10");
+    /// ```
     pub fn to_string_fmt(&self, fmt: &str) -> String {
         format_timespan(*self, fmt, '.')
     }
 
+    /// Formats using the decimal separator of the given locale.
+    ///
+    /// Only the `"g"` and `"G"` standard formats and the `f`/`F` custom
+    /// specifiers are affected; `"c"`/`"t"`/`"T"` always use `.`.
+    ///
+    /// ```
+    /// use cs_timespan::{TimeSpan, Locale};
+    /// let ts = TimeSpan::from_ticks(1_234_567_890_123);
+    ///
+    /// // French locale uses ',' as the decimal separator in "g" and "G"
+    /// assert_eq!(ts.to_string_fmt_with_culture("g", Locale::fr), "1:10:17:36,7890123");
+    /// assert_eq!(ts.to_string_fmt_with_culture("G", Locale::fr), "1:10:17:36,7890123");
+    ///
+    /// // "c" is always invariant regardless of locale
+    /// assert_eq!(ts.to_string_fmt_with_culture("c", Locale::fr), "1.10:17:36.7890123");
+    /// ```
     pub fn to_string_fmt_with_culture(&self, fmt: &str, locale: Locale) -> String {
         format_timespan(*self, fmt, decimal_sep(locale))
     }
