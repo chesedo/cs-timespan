@@ -219,7 +219,14 @@ impl TimeSpan {
     /// assert_eq!(ts.to_string_fmt_with_culture("c", Locale::fr), "1.10:17:36.7890123");
     /// ```
     pub fn to_string_fmt_with_culture(&self, fmt: &str, locale: Locale) -> String {
-        format_timespan(*self, fmt, decimal_sep(locale))
+        let sep = decimal_sep(locale);
+        let c = self.to_components();
+        match fmt {
+            "c" | "t" | "T" => format_constant(&c),
+            "g" => format_general_short(&c, sep),
+            "G" => format_general_long(&c, sep),
+            _ => format_custom(&c, fmt),
+        }
     }
 
     fn to_components(self) -> Components {
@@ -262,15 +269,6 @@ struct Components {
     sub_sec_ticks: u32,
 }
 
-fn format_timespan(ts: TimeSpan, fmt: &str, sep: char) -> String {
-    let c = ts.to_components();
-    match fmt {
-        "c" | "t" | "T" => format_constant(&c),
-        "g" => format_general_short(&c, sep),
-        "G" => format_general_long(&c, sep),
-        _ => format_custom(&c, fmt),
-    }
-}
 
 /// `"c"` / `"t"` / `"T"`: `[-][d.]hh:mm:ss[.fffffff]` — culture-invariant.
 fn format_constant(c: &Components) -> String {
