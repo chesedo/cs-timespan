@@ -135,16 +135,6 @@ impl TimeSpan {
         parse_impl::parse_lenient(s, decimal_sep(locale))
     }
 
-    /// Returns `None` instead of an error when parsing fails.
-    pub fn try_parse(s: &str) -> Option<Self> {
-        Self::parse(s).ok()
-    }
-
-    /// Returns `None` instead of an error when parsing fails.
-    pub fn try_parse_with_culture(s: &str, locale: Locale) -> Option<Self> {
-        Self::parse_with_culture(s, locale).ok()
-    }
-
     // ── Strict parsing (mirrors ParseExact / TryParseExact) ───────────────────
     pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
         parse_impl::parse_exact(s, fmt, '.')
@@ -196,14 +186,6 @@ impl TimeSpan {
         } else {
             Ok(ts)
         }
-    }
-
-    pub fn try_parse_exact(s: &str, fmt: &str) -> Option<Self> {
-        Self::parse_exact(s, fmt).ok()
-    }
-
-    pub fn try_parse_exact_any(s: &str, formats: &[&str]) -> Option<Self> {
-        Self::parse_exact_any(s, formats).ok()
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────────
