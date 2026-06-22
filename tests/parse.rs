@@ -31,7 +31,7 @@ fn parse_en_us_same_as_invariant() {
 fn parse_en_us_rejects_comma_separator() {
     assert_eq!(
         TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidCharacter),
     );
 }
 
@@ -259,56 +259,56 @@ fn parse_valid_croatian_culture_comma_separator() {
 
 #[test]
 fn parse_invalid_empty_string() {
-    assert_eq!(TimeSpan::parse(""), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse(""), Err(ParseError::Empty));
 }
 
 #[test]
 fn parse_invalid_lone_minus() {
-    assert_eq!(TimeSpan::parse("-"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("-"), Err(ParseError::Empty));
 }
 
 #[test]
 fn parse_invalid_garbage() {
-    assert_eq!(TimeSpan::parse("garbage"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("garbage"), Err(ParseError::InvalidCharacter));
 }
 
 #[test]
 fn parse_invalid_date_like_string() {
-    assert_eq!(TimeSpan::parse("12/12/12"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("12/12/12"), Err(ParseError::InvalidCharacter));
 }
 
 #[test]
 fn parse_invalid_trailing_colon() {
-    assert_eq!(TimeSpan::parse("00:"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("00:"), Err(ParseError::InvalidStructure));
 }
 
 #[test]
 fn parse_invalid_negative_component() {
-    assert_eq!(TimeSpan::parse("00:00:-01"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("00:00:-01"), Err(ParseError::InvalidCharacter));
 }
 
 #[test]
 fn parse_invalid_embedded_null_chars() {
-    assert_eq!(TimeSpan::parse("\x0012:34:56"), Err(ParseError::InvalidFormat));
-    assert_eq!(TimeSpan::parse("1\x0002:34:56"), Err(ParseError::InvalidFormat));
-    assert_eq!(TimeSpan::parse("12\x00:34:56"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("\x0012:34:56"), Err(ParseError::InvalidCharacter));
+    assert_eq!(TimeSpan::parse("1\x0002:34:56"), Err(ParseError::InvalidCharacter));
+    assert_eq!(TimeSpan::parse("12\x00:34:56"), Err(ParseError::InvalidCharacter));
 }
 
 #[test]
 fn parse_invalid_double_colon() {
-    assert_eq!(TimeSpan::parse("00:00::00"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("00:00::00"), Err(ParseError::InvalidStructure));
 }
 
 #[test]
 fn parse_invalid_trailing_colon_after_seconds() {
-    assert_eq!(TimeSpan::parse("00:00:00:"), Err(ParseError::InvalidFormat));
+    assert_eq!(TimeSpan::parse("00:00:00:"), Err(ParseError::InvalidStructure));
 }
 
 #[test]
 fn parse_invalid_too_many_components() {
     assert_eq!(
         TimeSpan::parse("00:00:00:00:00:00:00:00"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -317,7 +317,7 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
     // hr-HR expects comma; period is invalid
     assert_eq!(
         TimeSpan::parse_with_culture("6:12:14:45.3448", Locale::hr),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::WrongSeparator),
     );
 }
 

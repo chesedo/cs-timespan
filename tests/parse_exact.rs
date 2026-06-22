@@ -256,7 +256,7 @@ fn parse_exact_custom_percent_specifiers() {
 fn parse_exact_invalid_empty_string() {
     assert_eq!(
         TimeSpan::parse_exact("", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::Empty),
     );
 }
 
@@ -264,31 +264,34 @@ fn parse_exact_invalid_empty_string() {
 fn parse_exact_invalid_lone_minus() {
     assert_eq!(
         TimeSpan::parse_exact("-", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::Empty),
     );
 }
 
 #[test]
 fn parse_exact_invalid_garbage() {
+    // "garbage" has 0 colons; "c" format requires exactly 2
     assert_eq!(
         TimeSpan::parse_exact("garbage", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
 #[test]
 fn parse_exact_invalid_wrong_separator() {
+    // '?' replaces a colon → wrong colon count → InvalidStructure
     assert_eq!(
         TimeSpan::parse_exact("1?59:02", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("1:59?02", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
+    // '?' replaces the decimal separator → appears as non-digit inside a component
     assert_eq!(
         TimeSpan::parse_exact("1:59:02?123", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidCharacter),
     );
 }
 
@@ -297,7 +300,7 @@ fn parse_exact_c_rejects_d_colon_form() {
     // "c" format uses dot separator for days; colon-separated days is only valid in "g"
     assert_eq!(
         TimeSpan::parse_exact("1:12:24:02", "c"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -305,7 +308,7 @@ fn parse_exact_c_rejects_d_colon_form() {
 fn parse_exact_g_rejects_dot_separated_days() {
     assert_eq!(
         TimeSpan::parse_exact("1.12:24:02", "g"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -314,7 +317,7 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
     // "G" requires the full d:hh:mm:ss.fffffff pattern
     assert_eq!(
         TimeSpan::parse_exact("1:12:24:02", "G"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -322,7 +325,7 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
 fn parse_exact_invalid_empty_format_string() {
     assert_eq!(
         TimeSpan::parse_exact("00:00:00", ""),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -330,7 +333,7 @@ fn parse_exact_invalid_empty_format_string() {
 fn parse_exact_invalid_unknown_format_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12.5:2", "V"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -338,11 +341,11 @@ fn parse_exact_invalid_unknown_format_specifier() {
 fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
         TimeSpan::parse_exact("1", r"d%"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("1", r"%%d"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -350,36 +353,36 @@ fn parse_exact_invalid_percent_not_alone() {
 fn parse_exact_invalid_repeated_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hhh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:hh\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
 #[test]
 fn parse_exact_invalid_wrong_digit_count() {
-    // Input has more digits than the specifier expects
+    // Digit count mismatch causes the subsequent literal separator to not match
     assert_eq!(
         TimeSpan::parse_exact("123:34:56", r"hh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:345:56", r"hh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:056", r"hh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -387,20 +390,20 @@ fn parse_exact_invalid_wrong_digit_count() {
 fn parse_exact_invalid_triple_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mmm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:sss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
 #[test]
 fn parse_exact_invalid_f_wrong_digit_count() {
-    // "fff" expects exactly 3 fractional digits; "ffff" expects exactly 4
+    // "ffff" expects exactly 4 fractional digits; "678" is only 3 → input too short
     assert_eq!(
         TimeSpan::parse_exact("678", "ffff"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -408,7 +411,7 @@ fn parse_exact_invalid_f_wrong_digit_count() {
 fn parse_exact_invalid_f_uppercase_too_many_chars() {
     assert_eq!(
         TimeSpan::parse_exact("00000012", "FFFFFFFF"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -417,7 +420,7 @@ fn parse_exact_invalid_d_too_many_specifiers() {
     // Max is dddddddd (8 d's)
     assert_eq!(
         TimeSpan::parse_exact("000000123", "ddddddddd"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -425,7 +428,7 @@ fn parse_exact_invalid_d_too_many_specifiers() {
 fn parse_exact_invalid_duplicate_d_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"dd:dd:hh"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -433,7 +436,7 @@ fn parse_exact_invalid_duplicate_d_specifier() {
 fn parse_exact_invalid_too_many_digits_for_dd() {
     assert_eq!(
         TimeSpan::parse_exact("123:45", r"dd:hh"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -441,7 +444,7 @@ fn parse_exact_invalid_too_many_digits_for_dd() {
 fn parse_exact_invalid_unknown_specifier_vv() {
     assert_eq!(
         TimeSpan::parse_exact("12:34", r"dd:vv"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -449,7 +452,7 @@ fn parse_exact_invalid_unknown_specifier_vv() {
 fn parse_exact_invalid_ff_repeated() {
     assert_eq!(
         TimeSpan::parse_exact("12:45", "ff:ff"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -457,7 +460,7 @@ fn parse_exact_invalid_ff_repeated() {
 fn parse_exact_invalid_unclosed_literal_double_quote() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 minutes", r#"mm\:ss\ "minutes"#),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -465,7 +468,7 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
 fn parse_exact_invalid_unclosed_literal_single_quote() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 minutes", r"mm\:ss\ 'minutes"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -473,11 +476,11 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
 fn parse_exact_invalid_literal_mismatch() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 mints", r#"mm\:ss\ "minutes""#),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34 mints", r"mm\:ss\ 'minutes'"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidStructure),
     );
 }
 
@@ -580,13 +583,13 @@ fn parse_exact_overflow_custom_format() {
 
 #[test]
 fn parse_exact_invalid_custom_wrong_digit_count_for_padded() {
-    // "hh" specifier requires exactly 2 digits; "5" (1 digit) is wrong
+    // "hh" needs 2 digits; input only has 1 then hits ':', which is a non-digit character
     assert_eq!(
         TimeSpan::parse_exact("12.5:2:3", r"d\.hh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidCharacter),
     );
     assert_eq!(
         TimeSpan::parse_exact("12.5:2", r"d\.hh\:mm\:ss"),
-        Err(ParseError::InvalidFormat),
+        Err(ParseError::InvalidCharacter),
     );
 }
