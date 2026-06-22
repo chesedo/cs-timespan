@@ -1,3 +1,5 @@
+pub use num_format::Locale;
+
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
 ///
 /// Internally stores a tick count where 1 tick = 100 nanoseconds,
@@ -41,37 +43,6 @@ pub enum TimeSpanStyles {
     AssumeNegative,
 }
 
-/// Cultures relevant to `TimeSpan` formatting and parsing.
-///
-/// The C# implementation accepts any `CultureInfo` and reads its
-/// `NumberDecimalSeparator` dynamically — the decimal separator in fractional
-/// seconds (`.` vs `,`) is the only property that varies between cultures for
-/// `TimeSpan`; all other separators are fixed. The C# test suite exercises
-/// four specific culture tags: `CultureInfo.InvariantCulture`, `en-US`,
-/// `fr-FR`, and `hr-HR`, represented as the four named variants below.
-///
-/// For any culture not explicitly listed, use [`Other`], which applies a `.`
-/// decimal separator. For unlisted cultures that require `,`, use [`FrFR`]
-/// or [`HrHR`] — they are functionally identical to any other comma-separator
-/// culture (e.g. `de-DE`, `es-ES`).
-///
-/// [`Other`]: Culture::Other
-/// [`FrFR`]: Culture::FrFR
-/// [`HrHR`]: Culture::HrHR
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Culture {
-    /// `CultureInfo.InvariantCulture` — decimal separator is `.`
-    #[default]
-    Invariant,
-    /// English, United States (`en-US`) — decimal separator is `.`
-    EnUS,
-    /// Croatian (`hr-HR`) — decimal separator is `,`
-    HrHR,
-    /// French (`fr-FR`) — decimal separator is `,`
-    FrFR,
-    /// Any culture not explicitly listed above — decimal separator defaults to `.`
-    Other,
-}
 
 impl TimeSpan {
     // ── Tick-unit constants ────────────────────────────────────────────────────
@@ -97,24 +68,24 @@ impl TimeSpan {
 
     // ── Lenient parsing (mirrors Parse / TryParse) ─────────────────────────────
     pub fn parse(s: &str) -> Result<Self, ParseError> {
-        parse_impl::parse_lenient(s, Culture::Invariant)
+        parse_impl::parse_lenient(s, '.')
     }
 
-    pub fn parse_with_culture(s: &str, culture: Culture) -> Result<Self, ParseError> {
-        parse_impl::parse_lenient(s, culture)
+    pub fn parse_with_culture(s: &str, locale: Locale) -> Result<Self, ParseError> {
+        parse_impl::parse_lenient(s, decimal_sep(locale))
     }
 
     pub fn try_parse(s: &str) -> Option<Self> {
         Self::parse(s).ok()
     }
 
-    pub fn try_parse_with_culture(s: &str, culture: Culture) -> Option<Self> {
-        Self::parse_with_culture(s, culture).ok()
+    pub fn try_parse_with_culture(s: &str, locale: Locale) -> Option<Self> {
+        Self::parse_with_culture(s, locale).ok()
     }
 
     // ── Strict parsing (mirrors ParseExact / TryParseExact) ───────────────────
     pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
-        parse_impl::parse_exact(s, fmt, Culture::Invariant)
+        parse_impl::parse_exact(s, fmt, '.')
     }
 
     pub fn parse_exact_any(s: &str, formats: &[&str]) -> Result<Self, ParseError> {
@@ -131,19 +102,19 @@ impl TimeSpan {
     pub fn parse_exact_with_culture(
         s: &str,
         fmt: &str,
-        culture: Culture,
+        locale: Locale,
     ) -> Result<Self, ParseError> {
-        parse_impl::parse_exact(s, fmt, culture)
+        parse_impl::parse_exact(s, fmt, decimal_sep(locale))
     }
 
     pub fn parse_exact_any_with_culture(
         s: &str,
         formats: &[&str],
-        culture: Culture,
+        locale: Locale,
     ) -> Result<Self, ParseError> {
         let mut last = ParseError::InvalidFormat;
         for fmt in formats {
-            match Self::parse_exact_with_culture(s, fmt, culture) {
+            match Self::parse_exact_with_culture(s, fmt, locale) {
                 Ok(ts) => return Ok(ts),
                 Err(e) => last = e,
             }
@@ -154,10 +125,10 @@ impl TimeSpan {
     pub fn parse_exact_with_styles(
         s: &str,
         fmt: &str,
-        culture: Culture,
+        locale: Locale,
         styles: TimeSpanStyles,
     ) -> Result<Self, ParseError> {
-        let ts = parse_impl::parse_exact(s, fmt, culture)?;
+        let ts = parse_impl::parse_exact(s, fmt, decimal_sep(locale))?;
         if styles == TimeSpanStyles::AssumeNegative && ts.ticks > 0 {
             Ok(TimeSpan::from_ticks(-ts.ticks))
         } else {
@@ -175,11 +146,11 @@ impl TimeSpan {
 
     // ── Formatting ─────────────────────────────────────────────────────────────
     pub fn to_string_fmt(&self, fmt: &str) -> String {
-        format_timespan(*self, fmt, Culture::Invariant)
+        format_timespan(*self, fmt, '.')
     }
 
-    pub fn to_string_fmt_with_culture(&self, fmt: &str, culture: Culture) -> String {
-        format_timespan(*self, fmt, culture)
+    pub fn to_string_fmt_with_culture(&self, fmt: &str, locale: Locale) -> String {
+        format_timespan(*self, fmt, decimal_sep(locale))
     }
 
     fn to_components(self) -> Components {
@@ -222,12 +193,12 @@ struct Components {
     sub_sec_ticks: u32,
 }
 
-fn format_timespan(ts: TimeSpan, fmt: &str, culture: Culture) -> String {
+fn format_timespan(ts: TimeSpan, fmt: &str, sep: char) -> String {
     let c = ts.to_components();
     match fmt {
         "c" | "t" | "T" => format_constant(&c),
-        "g" => format_general_short(&c, culture),
-        "G" => format_general_long(&c, culture),
+        "g" => format_general_short(&c, sep),
+        "G" => format_general_long(&c, sep),
         _ => format_custom(&c, fmt),
     }
 }
@@ -251,7 +222,7 @@ fn format_constant(c: &Components) -> String {
 }
 
 /// `"g"`: `[-][d:]h:mm:ss[.FFFFFFF]` — culture-sensitive decimal separator.
-fn format_general_short(c: &Components, culture: Culture) -> String {
+fn format_general_short(c: &Components, sep: char) -> String {
     let mut out = String::new();
     if c.negative {
         out.push('-');
@@ -262,7 +233,7 @@ fn format_general_short(c: &Components, culture: Culture) -> String {
     }
     out.push_str(&format!("{}:{:02}:{:02}", c.hours, c.minutes, c.seconds));
     if c.sub_sec_ticks > 0 {
-        out.push(decimal_sep(culture));
+        out.push(sep);
         // FFFFFFF — trim trailing zeros
         out.push_str(&fmt_frac(c.sub_sec_ticks, 7, true));
     }
@@ -270,7 +241,7 @@ fn format_general_short(c: &Components, culture: Culture) -> String {
 }
 
 /// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
-fn format_general_long(c: &Components, culture: Culture) -> String {
+fn format_general_long(c: &Components, sep: char) -> String {
     let mut out = String::new();
     if c.negative {
         out.push('-');
@@ -281,7 +252,7 @@ fn format_general_long(c: &Components, culture: Culture) -> String {
         c.hours,
         c.minutes,
         c.seconds,
-        decimal_sep(culture),
+        sep,
         fmt_frac(c.sub_sec_ticks, 7, false),
     ));
     out
@@ -349,11 +320,8 @@ fn fmt_component(n: usize, val: u32) -> String {
     if n == 1 { val.to_string() } else { format!("{:02}", val) }
 }
 
-fn decimal_sep(culture: Culture) -> char {
-    match culture {
-        Culture::Invariant | Culture::EnUS | Culture::Other => '.',
-        Culture::HrHR | Culture::FrFR => ',',
-    }
+fn decimal_sep(locale: Locale) -> char {
+    locale.decimal().chars().next().unwrap_or('.')
 }
 
 fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
@@ -373,7 +341,7 @@ fn run_length(chars: &[char], start: usize, ch: char) -> usize {
 }
 
 mod parse_impl {
-    use super::{decimal_sep, Culture, ParseError, TimeSpan};
+    use super::{ParseError, TimeSpan};
 
     fn parse_uint(s: &str) -> Result<u64, ParseError> {
         if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
@@ -417,7 +385,7 @@ mod parse_impl {
         }
     }
 
-    pub fn parse_lenient(input: &str, culture: Culture) -> Result<TimeSpan, ParseError> {
+    pub fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         let s = input.trim();
         if s.is_empty() {
             return Err(ParseError::InvalidFormat);
@@ -425,8 +393,6 @@ mod parse_impl {
         if s.contains('\x00') {
             return Err(ParseError::InvalidFormat);
         }
-
-        let sep = decimal_sep(culture);
 
         let (neg, s) = if let Some(r) = s.strip_prefix('-') {
             (true, r)
@@ -548,11 +514,11 @@ mod parse_impl {
 
     // ── parse_exact ───────────────────────────────────────────────────────────
 
-    pub fn parse_exact(s: &str, fmt: &str, _culture: Culture) -> Result<TimeSpan, ParseError> {
+    pub fn parse_exact(s: &str, fmt: &str, sep: char) -> Result<TimeSpan, ParseError> {
         match fmt {
             "c" | "t" | "T" => parse_constant(s),
-            "g" => parse_g(s),
-            "G" => parse_g_upper(s),
+            "g" => parse_g(s, sep),
+            "G" => parse_g_upper(s, sep),
             "" => Err(ParseError::InvalidFormat),
             _ => parse_custom(s, fmt),
         }
@@ -590,14 +556,14 @@ mod parse_impl {
     }
 
     /// "g": `[-][d:]h:mm:ss[.FFFFFFF]`
-    fn parse_g(s: &str) -> Result<TimeSpan, ParseError> {
+    fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
         if s.trim().is_empty() { return Err(ParseError::InvalidFormat); }
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::InvalidFormat); }
 
-        // Dot before any colon would be days separator — invalid for "g".
+        // Sep before any colon would be days separator — invalid for "g".
         let first_colon = s.find(':');
-        if let Some(dot) = s.find('.') {
+        if let Some(dot) = s.find(sep) {
             if first_colon.map_or(true, |c| dot < c) {
                 return Err(ParseError::InvalidFormat);
             }
@@ -617,7 +583,7 @@ mod parse_impl {
             2 => {
                 let h = parse_uint(parts[0])? as u32;
                 let m = parse_uint(parts[1])? as u32;
-                let (sv, frac) = last_with_frac(parts[2], '.')?;
+                let (sv, frac) = last_with_frac(parts[2], sep)?;
                 if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
                 build(neg, 0, h, m, sv, frac)
             }
@@ -625,7 +591,7 @@ mod parse_impl {
                 let d = parse_uint(parts[0])?;
                 let h = parse_uint(parts[1])? as u32;
                 let m = parse_uint(parts[2])? as u32;
-                let (sv, frac) = last_with_frac(parts[3], '.')?;
+                let (sv, frac) = last_with_frac(parts[3], sep)?;
                 if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
                 build(neg, d, h, m, sv, frac)
             }
@@ -634,7 +600,7 @@ mod parse_impl {
     }
 
     /// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
-    fn parse_g_upper(s: &str) -> Result<TimeSpan, ParseError> {
+    fn parse_g_upper(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
         if s.trim().is_empty() { return Err(ParseError::InvalidFormat); }
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::InvalidFormat); }
@@ -647,7 +613,7 @@ mod parse_impl {
         let d = parse_uint(parts[0])?;
         let h = parse_uint(parts[1])? as u32;
         let m = parse_uint(parts[2])? as u32;
-        let dot = parts[3].find('.').ok_or(ParseError::InvalidFormat)?;
+        let dot = parts[3].find(sep).ok_or(ParseError::InvalidFormat)?;
         let sv = parse_uint(&parts[3][..dot])? as u32;
         let frac = parse_frac(&parts[3][dot + 1..])?;
 

@@ -11,18 +11,18 @@
 // - C# `new TimeSpan(d, h, m, s, ms)` → `ts5(d, h, m, s, ms)` (5-arg)
 // - C# `new TimeSpan(ticks)`         → `TimeSpan::from_ticks(ticks)`
 
-use cs_timespan::{Culture, ParseError, TimeSpan};
+use cs_timespan::{Locale, ParseError, TimeSpan};
 
 // ── en-US behaves identically to Invariant (both use '.' as decimal separator) ─
 
 #[test]
 fn parse_en_us_same_as_invariant() {
     assert_eq!(
-        TimeSpan::parse_with_culture("12:24:02.01", Culture::EnUS),
+        TimeSpan::parse_with_culture("12:24:02.01", Locale::en),
         Ok(ts5(0, 12, 24, 2, 10)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1.12:24:02.999", Culture::EnUS),
+        TimeSpan::parse_with_culture("1.12:24:02.999", Locale::en),
         Ok(ts5(1, 12, 24, 2, 999)),
     );
 }
@@ -30,7 +30,7 @@ fn parse_en_us_same_as_invariant() {
 #[test]
 fn parse_en_us_rejects_comma_separator() {
     assert_eq!(
-        TimeSpan::parse_with_culture("6:12:14:45,348", Culture::EnUS),
+        TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en),
         Err(ParseError::InvalidFormat),
     );
 }
@@ -96,7 +96,7 @@ fn parse_valid_d_dot_hm() {
 #[test]
 fn parse_valid_fractional_two_digits() {
     assert_eq!(
-        TimeSpan::parse_with_culture("12:24:02.01", Culture::Invariant),
+        TimeSpan::parse_with_culture("12:24:02.01", Locale::en),
         Ok(ts5(0, 12, 24, 2, 10)),
     );
 }
@@ -105,11 +105,11 @@ fn parse_valid_fractional_two_digits() {
 fn parse_valid_fractional_trailing_zeros() {
     // .0 and .0000000 both mean zero sub-second ticks
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.0", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.0", Locale::en),
         Ok(ts3(1, 1, 1)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.0000000", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.0000000", Locale::en),
         Ok(ts3(1, 1, 1)),
     );
 }
@@ -118,31 +118,31 @@ fn parse_valid_fractional_trailing_zeros() {
 fn parse_valid_fractional_precision() {
     // Each additional fractional digit adds sub-millisecond precision
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.1", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.1", Locale::en),
         Ok(ts5(0, 1, 1, 1, 100)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.01", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.01", Locale::en),
         Ok(ts5(0, 1, 1, 1, 10)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.001", Locale::en),
         Ok(ts5(0, 1, 1, 1, 1)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.0001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.0001", Locale::en),
         Ok(TimeSpan::from_ticks(36610001000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.00001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.00001", Locale::en),
         Ok(TimeSpan::from_ticks(36610000100)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.000001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.000001", Locale::en),
         Ok(TimeSpan::from_ticks(36610000010)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:1.0000001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:1.0000001", Locale::en),
         Ok(TimeSpan::from_ticks(36610000001)),
     );
 }
@@ -162,7 +162,7 @@ fn parse_valid_d_colon_hms() {
 fn parse_valid_empty_seconds_with_fraction() {
     // "01.23:45:.67" — seconds component is empty, fraction is present
     assert_eq!(
-        TimeSpan::parse_with_culture("01.23:45:.67", Culture::Invariant),
+        TimeSpan::parse_with_culture("01.23:45:.67", Locale::en),
         Ok(ts5(1, 23, 45, 0, 670)),
     );
 }
@@ -170,7 +170,7 @@ fn parse_valid_empty_seconds_with_fraction() {
 #[test]
 fn parse_valid_full_with_millis() {
     assert_eq!(
-        TimeSpan::parse_with_culture("1.12:24:02.999", Culture::Invariant),
+        TimeSpan::parse_with_culture("1.12:24:02.999", Locale::en),
         Ok(ts5(1, 12, 24, 2, 999)),
     );
 }
@@ -179,31 +179,31 @@ fn parse_valid_full_with_millis() {
 fn parse_valid_hm_fractional_precision() {
     // h:m:.fraction — seconds component empty
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.1", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.1", Locale::en),
         Ok(TimeSpan::from_ticks(36601000000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.01", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.01", Locale::en),
         Ok(TimeSpan::from_ticks(36600100000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.001", Locale::en),
         Ok(TimeSpan::from_ticks(36600010000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.0001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.0001", Locale::en),
         Ok(TimeSpan::from_ticks(36600001000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.00001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.00001", Locale::en),
         Ok(TimeSpan::from_ticks(36600000100)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.000001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.000001", Locale::en),
         Ok(TimeSpan::from_ticks(36600000010)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("1:1:.0000001", Culture::Invariant),
+        TimeSpan::parse_with_culture("1:1:.0000001", Locale::en),
         Ok(TimeSpan::from_ticks(36600000001)),
     );
 }
@@ -232,7 +232,7 @@ fn parse_valid_near_max_value() {
         Ok(TimeSpan::from_ticks(9223372036850000000)),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("10675199:02:48:05.4775", Culture::Invariant),
+        TimeSpan::parse_with_culture("10675199:02:48:05.4775", Locale::en),
         Ok(TimeSpan::from_ticks(9223372036854775000)),
     );
 }
@@ -250,7 +250,7 @@ fn parse_valid_common_values() {
 fn parse_valid_croatian_culture_comma_separator() {
     // hr-HR uses comma as the decimal separator
     assert_eq!(
-        TimeSpan::parse_with_culture("6:12:14:45,348", Culture::HrHR),
+        TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr),
         Ok(ts5(6, 12, 14, 45, 348)),
     );
 }
@@ -316,7 +316,7 @@ fn parse_invalid_too_many_components() {
 fn parse_invalid_wrong_decimal_separator_for_culture() {
     // hr-HR expects comma; period is invalid
     assert_eq!(
-        TimeSpan::parse_with_culture("6:12:14:45.3448", Culture::HrHR),
+        TimeSpan::parse_with_culture("6:12:14:45.3448", Locale::hr),
         Err(ParseError::InvalidFormat),
     );
 }
@@ -358,11 +358,11 @@ fn parse_overflow_exceeds_max_value() {
         Err(ParseError::Overflow),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("10675199:02:48:05.4776", Culture::Invariant),
+        TimeSpan::parse_with_culture("10675199:02:48:05.4776", Locale::en),
         Err(ParseError::Overflow),
     );
     assert_eq!(
-        TimeSpan::parse_with_culture("-10675199:02:48:05.4776", Culture::Invariant),
+        TimeSpan::parse_with_culture("-10675199:02:48:05.4776", Locale::en),
         Err(ParseError::Overflow),
     );
 }

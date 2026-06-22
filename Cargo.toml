@@ -8,4 +8,5 @@ default = []
 chrono = ["dep:chrono"]
 
 [dependencies]
+num-format = "0.4"
 chrono = { version = "0.4", optional = true }

@@ -10,7 +10,7 @@
 // - C# `new TimeSpan(d, h, m, s, ms)` → `ts5(d, h, m, s, ms)`
 // - C# `-new TimeSpan(...)` (negation) → `neg(ts*(...))`
 
-use cs_timespan::{Culture, ParseError, TimeSpan, TimeSpanStyles};
+use cs_timespan::{Locale, ParseError, TimeSpan, TimeSpanStyles};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -487,7 +487,7 @@ fn parse_exact_invalid_literal_mismatch() {
 fn parse_exact_with_styles_none_matches_parse_exact() {
     // TimeSpanStyles::None produces identical output to parse_exact.
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Culture::Invariant, TimeSpanStyles::None),
+        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Locale::en, TimeSpanStyles::None),
         Ok(ts4(0, 1, 2, 3)),
     );
 }
@@ -496,7 +496,7 @@ fn parse_exact_with_styles_none_matches_parse_exact() {
 fn parse_exact_with_styles_assume_negative_custom_format() {
     // Without a leading '-' in the input, AssumeNegative flips the sign.
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Culture::Invariant, TimeSpanStyles::AssumeNegative),
+        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Locale::en, TimeSpanStyles::AssumeNegative),
         Ok(neg(ts4(0, 1, 2, 3))),
     );
 }
@@ -504,7 +504,7 @@ fn parse_exact_with_styles_assume_negative_custom_format() {
 #[test]
 fn parse_exact_with_styles_assume_negative_standard_format() {
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("01:02:03", "c", Culture::Invariant, TimeSpanStyles::AssumeNegative),
+        TimeSpan::parse_exact_with_styles("01:02:03", "c", Locale::en, TimeSpanStyles::AssumeNegative),
         Ok(neg(ts4(0, 1, 2, 3))),
     );
 }
@@ -513,7 +513,7 @@ fn parse_exact_with_styles_assume_negative_standard_format() {
 fn parse_exact_with_styles_assume_negative_zero_stays_zero() {
     // Negating zero produces zero.
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("0", "%d", Culture::Invariant, TimeSpanStyles::AssumeNegative),
+        TimeSpan::parse_exact_with_styles("0", "%d", Locale::en, TimeSpanStyles::AssumeNegative),
         Ok(TimeSpan::ZERO),
     );
 }

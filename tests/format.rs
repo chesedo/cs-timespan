@@ -14,7 +14,7 @@
 // - C# `null` format and `"c"` / `"t"` / `"T"` all produce identical output;
 //   the null case maps to `Display` (`ts.to_string()`).
 
-use cs_timespan::{Culture, TimeSpan};
+use cs_timespan::{Locale, TimeSpan};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ fn format_custom_composite_dd_dot_ss() {
 #[test]
 fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     // Custom format specifiers are not culture-sensitive
-    for culture in [Culture::Invariant, Culture::EnUS, Culture::FrFR, Culture::HrHR] {
+    for culture in [Locale::en, Locale::en_GB, Locale::fr, Locale::hr] {
         assert_eq!(
             input().to_string_fmt_with_culture(r"dd\.ss", culture),
             "142.18",
@@ -250,7 +250,7 @@ fn format_constant_dhmsm() {
 fn format_constant_is_culture_invariant() {
     // "c"/"t"/"T" output must not change with culture
     for fmt in ["c", "t", "T"] {
-        for culture in [Culture::Invariant, Culture::EnUS, Culture::FrFR, Culture::HrHR] {
+        for culture in [Locale::en, Locale::en_GB, Locale::fr, Locale::hr] {
             assert_eq!(
                 input().to_string_fmt_with_culture(fmt, culture),
                 "142.21:21:18.9101112",
@@ -275,7 +275,7 @@ fn format_display_equals_c_format() {
 #[test]
 fn format_g_invariant_large_value() {
     assert_eq!(
-        input().to_string_fmt_with_culture("g", Culture::Invariant),
+        input().to_string_fmt_with_culture("g", Locale::en),
         "142:21:21:18.9101112",
     );
 }
@@ -297,7 +297,7 @@ fn format_g_invariant_common_values() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("g", Culture::Invariant),
+            ts.to_string_fmt_with_culture("g", Locale::en),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -323,7 +323,7 @@ fn format_g_fr_fr_uses_comma_separator() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("g", Culture::FrFR),
+            ts.to_string_fmt_with_culture("g", Locale::fr),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -336,7 +336,7 @@ fn format_g_fr_fr_uses_comma_separator() {
 #[test]
 fn format_g_upper_invariant_large_value() {
     assert_eq!(
-        input().to_string_fmt_with_culture("G", Culture::Invariant),
+        input().to_string_fmt_with_culture("G", Locale::en),
         "142:21:21:18.9101112",
     );
 }
@@ -358,7 +358,7 @@ fn format_g_upper_invariant_common_values() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("G", Culture::Invariant),
+            ts.to_string_fmt_with_culture("G", Locale::en),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -384,7 +384,7 @@ fn format_g_upper_fr_fr_uses_comma_separator() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("G", Culture::FrFR),
+            ts.to_string_fmt_with_culture("G", Locale::fr),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
