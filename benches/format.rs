@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use cs_timespan::{Locale, TimeSpan};
 
@@ -63,11 +65,16 @@ fn bench_format_custom(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
-    bench_format_constant,
-    bench_format_display,
-    bench_format_g,
-    bench_format_g_upper,
-    bench_format_custom,
+    name = benches;
+    config = Criterion::default()
+        .measurement_time(Duration::from_secs(2))
+        .warm_up_time(Duration::from_millis(500))
+        .sample_size(50);
+    targets =
+        bench_format_constant,
+        bench_format_display,
+        bench_format_g,
+        bench_format_g_upper,
+        bench_format_custom,
 );
 criterion_main!(benches);
