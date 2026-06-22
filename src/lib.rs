@@ -424,6 +424,50 @@ fn run_length(chars: &[char], start: usize, ch: char) -> usize {
 mod parse_impl {
     use super::{ParseError, TimeSpan};
 
+    // ── Builder ───────────────────────────────────────────────────────────────
+
+    #[derive(Default)]
+    struct Builder<'a> {
+        neg: bool,
+        days: Option<&'a str>,
+        hours: Option<&'a str>,
+        minutes: Option<&'a str>,
+        seconds: Option<&'a str>,
+        frac: Option<&'a str>,
+    }
+
+    impl<'a> Builder<'a> {
+        fn new(neg: bool) -> Self {
+            Self { neg, ..Default::default() }
+        }
+
+        fn build(self) -> Result<TimeSpan, ParseError> {
+            let days = parse_component_uint(self.days)?;
+            let h    = parse_component_uint(self.hours)? as u32;
+            let m    = parse_component_uint(self.minutes)? as u32;
+            let sv   = parse_component_uint(self.seconds)? as u32;
+            let frac = parse_component_frac(self.frac)?;
+            if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
+            build_ticks(self.neg, days, h, m, sv, frac)
+        }
+    }
+
+    fn parse_component_uint(s: Option<&str>) -> Result<u64, ParseError> {
+        match s {
+            None | Some("") => Ok(0),
+            Some(s) => parse_uint(s),
+        }
+    }
+
+    fn parse_component_frac(s: Option<&str>) -> Result<u32, ParseError> {
+        match s {
+            None => Ok(0),
+            Some(s) => parse_frac(s),
+        }
+    }
+
+    // ── Low-level validators ──────────────────────────────────────────────────
+
     fn parse_uint(s: &str) -> Result<u64, ParseError> {
         if s.is_empty() { return Err(ParseError::InvalidStructure); }
         if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
@@ -433,14 +477,12 @@ mod parse_impl {
     fn parse_frac(s: &str) -> Result<u32, ParseError> {
         if s.is_empty() { return Err(ParseError::InvalidStructure); }
         if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
-        if s.len() > 7 {
-            return Err(ParseError::Overflow);
-        }
+        if s.len() > 7 { return Err(ParseError::Overflow); }
         let v = s.parse::<u32>().unwrap();
         Ok(v * 10u32.pow(7 - s.len() as u32))
     }
 
-    fn build(neg: bool, days: u64, h: u32, m: u32, s: u32, frac: u32) -> Result<TimeSpan, ParseError> {
+    fn build_ticks(neg: bool, days: u64, h: u32, m: u32, s: u32, frac: u32) -> Result<TimeSpan, ParseError> {
         let ticks = (days as u128)
             .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
             .and_then(|t| t.checked_add(h as u128 * TimeSpan::TICKS_PER_HOUR as u128))
@@ -464,130 +506,105 @@ mod parse_impl {
         }
     }
 
+    // ── Lenient parser (parse / parse_with_culture) ───────────────────────────
+
     pub fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         let s = input.trim();
-        if s.is_empty() {
-            return Err(ParseError::Empty);
-        }
-        if s.contains('\x00') {
-            return Err(ParseError::InvalidCharacter);
-        }
+        if s.is_empty() { return Err(ParseError::Empty); }
+        if s.contains('\x00') { return Err(ParseError::InvalidCharacter); }
 
-        let (neg, s) = if let Some(r) = s.strip_prefix('-') {
-            (true, r)
-        } else {
-            (false, s)
-        };
-        if s.is_empty() {
-            return Err(ParseError::Empty);
-        }
+        let (neg, s) = strip_neg(s);
+        if s.is_empty() { return Err(ParseError::Empty); }
 
         // A '.' before the first ':' is the days separator (always '.', culture-independent).
         let first_colon = s.find(':');
         let days_dot = s.find('.').filter(|&d| first_colon.map_or(true, |c| d < c));
 
-        let (days, time_s) = if let Some(dot) = days_dot {
-            (parse_uint(&s[..dot])?, &s[dot + 1..])
+        let (days_str, time_s) = if let Some(dot) = days_dot {
+            (Some(&s[..dot]), &s[dot + 1..])
         } else {
-            (0u64, s)
+            (None, s)
         };
 
         let n_colons = time_s.bytes().filter(|&b| b == b':').count();
 
         if n_colons == 0 {
-            // Bare integer: days (when no dot prefix) or invalid (when dot prefix without time)
-            if days_dot.is_some() {
-                return Err(ParseError::InvalidStructure);
-            }
-            let d = parse_uint(time_s)?;
-            return build(neg, d, 0, 0, 0, 0);
+            if days_dot.is_some() { return Err(ParseError::InvalidStructure); }
+            let mut b = Builder::new(neg);
+            b.days = Some(time_s);
+            return b.build();
         }
 
-        // Split into colon-separated parts; last part may carry a fractional suffix.
         let parts: Vec<&str> = time_s.splitn(n_colons + 1, ':').collect();
 
-        // All but last must be pure non-empty digit strings.
+        // All but the last component must be non-empty digit strings.
         for p in &parts[..parts.len() - 1] {
             if p.is_empty() { return Err(ParseError::InvalidStructure); }
             if !p.bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
         }
 
-        // Last part: optional "integer[sep fraction]" or "[sep fraction]" (empty seconds).
+        // Last component: optional `integer[sep fraction]` or `[sep fraction]`.
         let last = *parts.last().unwrap();
-        let (last_int_s, frac) = if let Some(d) = last.find(sep) {
-            let frac_part = &last[d + sep.len_utf8()..];
-            (&last[..d], parse_frac(frac_part)?)
+        let (last_int_s, frac_s) = if let Some(d) = last.find(sep) {
+            (&last[..d], Some(&last[d + sep.len_utf8()..]))
         } else {
-            // Reject wrong-culture decimal separator in the last segment.
-            if sep != '.' && last.contains('.') {
-                return Err(ParseError::WrongSeparator);
-            }
-            (last, 0u32)
+            if sep != '.' && last.contains('.') { return Err(ParseError::WrongSeparator); }
+            (last, None)
         };
 
-        // Validate the integer portion of the last segment.
         if !last_int_s.is_empty() && !last_int_s.bytes().all(|b| b.is_ascii_digit()) {
             return Err(ParseError::InvalidCharacter);
         }
-        // Trailing colon with no content (and no fraction) is invalid.
-        if last_int_s.is_empty() && !last.starts_with(sep) {
-            return Err(ParseError::InvalidStructure);
-        }
+        // Trailing colon with no integer and no fraction is structurally invalid.
+        if last_int_s.is_empty() && frac_s.is_none() { return Err(ParseError::InvalidStructure); }
 
-        let mut vals: Vec<u64> = parts[..parts.len() - 1]
-            .iter()
-            .map(|p| parse_uint(p))
-            .collect::<Result<_, _>>()?;
-        let last_val = if last_int_s.is_empty() { 0 } else { parse_uint(last_int_s)? };
-        vals.push(last_val);
+        let total = parts.len();
+        let mut b = Builder::new(neg);
+        b.frac = frac_s;
 
-        let total = vals.len();
-        let mut d = days;
-
-        let (h, m, sv) = match (days_dot.is_some(), total) {
-            // d.h:m
+        match (days_dot.is_some(), total) {
+            // d.h:m[.frac]
             (true, 2) => {
-                let (h, m) = (vals[0] as u32, vals[1] as u32);
-                if h >= 24 || m >= 60 { return Err(ParseError::Overflow); }
-                (h, m, 0u32)
+                b.days    = days_str;
+                b.hours   = Some(parts[0]);
+                b.minutes = Some(last_int_s);
             }
-            // d.h:m:s
+            // d.h:m:s[.frac]
             (true, 3) => {
-                let (h, m, sv) = (vals[0] as u32, vals[1] as u32, vals[2] as u32);
-                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-                (h, m, sv)
+                b.days    = days_str;
+                b.hours   = Some(parts[0]);
+                b.minutes = Some(parts[1]);
+                b.seconds = Some(last_int_s);
             }
-            // h:m
+            // h:m[.frac]
             (false, 2) => {
-                let (h, m) = (vals[0] as u32, vals[1] as u32);
-                if h >= 24 { return Err(ParseError::Overflow); }
-                if m >= 60 { return Err(ParseError::Overflow); }
-                (h, m, 0u32)
+                b.hours   = Some(parts[0]);
+                b.minutes = Some(last_int_s);
             }
-            // h:m:s  or  d:h:m (when first > 23)
+            // h:m:s[.frac]  or  d:h:m[.frac] when first component > 23
             (false, 3) => {
-                if vals[0] > 23 {
-                    d = vals[0];
-                    let (h, m) = (vals[1] as u32, vals[2] as u32);
-                    if h >= 24 || m >= 60 { return Err(ParseError::Overflow); }
-                    (h, m, 0u32)
+                let first_val = parse_component_uint(Some(parts[0]))?;
+                if first_val > 23 {
+                    b.days    = Some(parts[0]);
+                    b.hours   = Some(parts[1]);
+                    b.minutes = Some(last_int_s);
                 } else {
-                    let (h, m, sv) = (vals[0] as u32, vals[1] as u32, vals[2] as u32);
-                    if m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-                    (h, m, sv)
+                    b.hours   = Some(parts[0]);
+                    b.minutes = Some(parts[1]);
+                    b.seconds = Some(last_int_s);
                 }
             }
-            // d:h:m:s
+            // d:h:m:s[.frac]
             (false, 4) => {
-                d = vals[0];
-                let (h, m, sv) = (vals[1] as u32, vals[2] as u32, vals[3] as u32);
-                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-                (h, m, sv)
+                b.days    = Some(parts[0]);
+                b.hours   = Some(parts[1]);
+                b.minutes = Some(parts[2]);
+                b.seconds = Some(last_int_s);
             }
             _ => return Err(ParseError::InvalidStructure),
-        };
+        }
 
-        build(neg, d, h, m, sv, frac)
+        b.build()
     }
 
     // ── parse_exact ───────────────────────────────────────────────────────────
@@ -606,6 +623,13 @@ mod parse_impl {
         if let Some(r) = s.strip_prefix('-') { (true, r) } else { (false, s) }
     }
 
+    fn split_at_sep<'a>(s: &'a str, sep: char) -> (&'a str, Option<&'a str>) {
+        match s.find(sep) {
+            Some(d) => (&s[..d], Some(&s[d + sep.len_utf8()..])),
+            None    => (s, None),
+        }
+    }
+
     /// "c"/"t"/"T": `[-][d.]hh:mm:ss[.fffffff]`
     fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
         if s.trim().is_empty() { return Err(ParseError::Empty); }
@@ -616,21 +640,24 @@ mod parse_impl {
             return Err(ParseError::InvalidStructure);
         }
 
-        // Strip optional "d." prefix (dot must come before the first colon).
         let first_colon = s.find(':').unwrap();
-        let (days, s) = if let Some(dot) = s[..first_colon].find('.') {
-            (parse_uint(&s[..dot])?, &s[dot + 1..])
+        let (days_str, time_s) = if let Some(dot) = s[..first_colon].find('.') {
+            (Some(&s[..dot]), &s[dot + 1..])
         } else {
-            (0u64, s)
+            (None, s)
         };
 
-        // s is now "hh:mm:ss[.fffffff]" — exactly 2 colons remain.
-        let parts: Vec<&str> = s.splitn(3, ':').collect();
-        let h = parse_uint(parts[0])? as u32;
-        let m = parse_uint(parts[1])? as u32;
-        let (sv, frac) = last_with_frac(parts[2], '.')?;
-        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-        build(neg, days, h, m, sv, frac)
+        let parts: Vec<&str> = time_s.splitn(3, ':').collect();
+        let (sec_s, frac_s) = split_at_sep(parts[2], '.');
+        if sec_s.is_empty() && frac_s.is_none() { return Err(ParseError::InvalidStructure); }
+
+        let mut b = Builder::new(neg);
+        b.days    = days_str;
+        b.hours   = Some(parts[0]);
+        b.minutes = Some(parts[1]);
+        b.seconds = Some(sec_s);
+        b.frac    = frac_s;
+        b.build()
     }
 
     /// "g": `[-][d:]h:mm:ss[.FFFFFFF]`
@@ -639,7 +666,7 @@ mod parse_impl {
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::Empty); }
 
-        // Sep before any colon would be days separator — invalid for "g".
+        // Separator before the first colon would mean a days-dot — invalid for "g".
         let first_colon = s.find(':');
         if let Some(dot) = s.find(sep) {
             if first_colon.map_or(true, |c| dot < c) {
@@ -649,32 +676,35 @@ mod parse_impl {
 
         let n_colons = s.bytes().filter(|&b| b == b':').count();
         let parts: Vec<&str> = s.splitn(n_colons + 1, ':').collect();
+        let mut b = Builder::new(neg);
 
         match n_colons {
-            0 => build(neg, parse_uint(parts[0])?, 0, 0, 0, 0),
+            0 => { b.days = Some(parts[0]); }
             1 => {
-                let h = parse_uint(parts[0])? as u32;
-                let m = parse_uint(parts[1])? as u32;
-                if h >= 24 || m >= 60 { return Err(ParseError::Overflow); }
-                build(neg, 0, h, m, 0, 0)
+                b.hours   = Some(parts[0]);
+                b.minutes = Some(parts[1]);
             }
             2 => {
-                let h = parse_uint(parts[0])? as u32;
-                let m = parse_uint(parts[1])? as u32;
-                let (sv, frac) = last_with_frac(parts[2], sep)?;
-                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-                build(neg, 0, h, m, sv, frac)
+                let (sec_s, frac_s) = split_at_sep(parts[2], sep);
+                if sec_s.is_empty() && frac_s.is_none() { return Err(ParseError::InvalidStructure); }
+                b.hours   = Some(parts[0]);
+                b.minutes = Some(parts[1]);
+                b.seconds = Some(sec_s);
+                b.frac    = frac_s;
             }
             3 => {
-                let d = parse_uint(parts[0])?;
-                let h = parse_uint(parts[1])? as u32;
-                let m = parse_uint(parts[2])? as u32;
-                let (sv, frac) = last_with_frac(parts[3], sep)?;
-                if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-                build(neg, d, h, m, sv, frac)
+                let (sec_s, frac_s) = split_at_sep(parts[3], sep);
+                if sec_s.is_empty() && frac_s.is_none() { return Err(ParseError::InvalidStructure); }
+                b.days    = Some(parts[0]);
+                b.hours   = Some(parts[1]);
+                b.minutes = Some(parts[2]);
+                b.seconds = Some(sec_s);
+                b.frac    = frac_s;
             }
-            _ => Err(ParseError::InvalidStructure),
+            _ => return Err(ParseError::InvalidStructure),
         }
+
+        b.build()
     }
 
     /// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
@@ -688,15 +718,15 @@ mod parse_impl {
         }
 
         let parts: Vec<&str> = s.splitn(4, ':').collect();
-        let d = parse_uint(parts[0])?;
-        let h = parse_uint(parts[1])? as u32;
-        let m = parse_uint(parts[2])? as u32;
         let dot = parts[3].find(sep).ok_or(ParseError::InvalidStructure)?;
-        let sv = parse_uint(&parts[3][..dot])? as u32;
-        let frac = parse_frac(&parts[3][dot + 1..])?;
 
-        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-        build(neg, d, h, m, sv, frac)
+        let mut b = Builder::new(neg);
+        b.days    = Some(parts[0]);
+        b.hours   = Some(parts[1]);
+        b.minutes = Some(parts[2]);
+        b.seconds = Some(&parts[3][..dot]);
+        b.frac    = Some(&parts[3][dot + sep.len_utf8()..]);
+        b.build()
     }
 
     /// Custom format specifier parsing.
@@ -704,11 +734,7 @@ mod parse_impl {
         let fmt_chars: Vec<char> = fmt.chars().collect();
         let mut inp = input;
         let mut fi = 0;
-        let mut days: Option<u64> = None;
-        let mut hours: Option<u32> = None;
-        let mut minutes: Option<u32> = None;
-        let mut seconds: Option<u32> = None;
-        let mut frac: Option<u32> = None;
+        let mut b = Builder::new(false);
 
         while fi < fmt_chars.len() {
             match fmt_chars[fi] {
@@ -716,7 +742,7 @@ mod parse_impl {
                     fi += 1;
                     let ch = fmt_chars[fi];
                     fi += 1;
-                    apply_spec(ch, 1, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                    apply_spec(ch, 1, &mut inp, &mut b)?;
                 }
                 '%' => return Err(ParseError::InvalidStructure),
                 ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
@@ -724,7 +750,7 @@ mod parse_impl {
                     fi += n;
                     let max = match ch { 'd' => 8, 'h' | 'm' | 's' => 2, _ => 7 };
                     if n > max { return Err(ParseError::InvalidStructure); }
-                    apply_spec(ch, n, &mut inp, &mut days, &mut hours, &mut minutes, &mut seconds, &mut frac)?;
+                    apply_spec(ch, n, &mut inp, &mut b)?;
                 }
                 '\\' if fi + 1 < fmt_chars.len() => {
                     fi += 1;
@@ -750,73 +776,51 @@ mod parse_impl {
         }
 
         if !inp.is_empty() { return Err(ParseError::InvalidStructure); }
-        let h = hours.unwrap_or(0);
-        let m = minutes.unwrap_or(0);
-        let sv = seconds.unwrap_or(0);
-        if h >= 24 || m >= 60 || sv >= 60 { return Err(ParseError::Overflow); }
-        build(false, days.unwrap_or(0), h, m, sv, frac.unwrap_or(0))
+        b.build()
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn apply_spec<'a>(
         ch: char, n: usize,
         inp: &mut &'a str,
-        days: &mut Option<u64>, hours: &mut Option<u32>,
-        minutes: &mut Option<u32>, seconds: &mut Option<u32>,
-        frac: &mut Option<u32>,
+        b: &mut Builder<'a>,
     ) -> Result<(), ParseError> {
-        macro_rules! dup { ($s:expr) => { if $s.is_some() { return Err(ParseError::InvalidStructure); } }; }
+        macro_rules! dup { ($field:expr) => { if $field.is_some() { return Err(ParseError::InvalidStructure); } }; }
         match ch {
-            'd' => { dup!(days);    let v = if n == 1 { read_greedy(inp, 8)? } else { read_exact(inp, n)? }; *days = Some(v); }
-            'h' => { dup!(hours);   let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *hours = Some(v as u32); }
-            'm' => { dup!(minutes); let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *minutes = Some(v as u32); }
-            's' => { dup!(seconds); let v = if n == 1 { read_greedy(inp, 2)? } else { read_exact(inp, n)? }; *seconds = Some(v as u32); }
-            'f' | 'F' => {
-                dup!(frac);
-                let v = read_frac(inp, n, ch == 'F')?;
-                *frac = Some(v);
-            }
+            'd' => { dup!(b.days);    b.days    = Some(if n == 1 { read_greedy_str(inp, 8)? } else { read_exact_str(inp, n)? }); }
+            'h' => { dup!(b.hours);   b.hours   = Some(if n == 1 { read_greedy_str(inp, 2)? } else { read_exact_str(inp, n)? }); }
+            'm' => { dup!(b.minutes); b.minutes = Some(if n == 1 { read_greedy_str(inp, 2)? } else { read_exact_str(inp, n)? }); }
+            's' => { dup!(b.seconds); b.seconds = Some(if n == 1 { read_greedy_str(inp, 2)? } else { read_exact_str(inp, n)? }); }
+            'f' | 'F' => { dup!(b.frac); b.frac = Some(read_frac_str(inp, n, ch == 'F')?); }
             _ => return Err(ParseError::InvalidStructure),
         }
         Ok(())
     }
 
-    fn read_greedy<'a>(inp: &mut &'a str, max: usize) -> Result<u64, ParseError> {
+    fn read_greedy_str<'a>(inp: &mut &'a str, max: usize) -> Result<&'a str, ParseError> {
         let n = inp.bytes().take(max).take_while(|b| b.is_ascii_digit()).count();
         if n == 0 { return Err(ParseError::InvalidStructure); }
-        let v = inp[..n].parse::<u64>().map_err(|_| ParseError::Overflow)?;
+        let s = &inp[..n];
         *inp = &inp[n..];
-        Ok(v)
+        Ok(s)
     }
 
-    fn read_exact<'a>(inp: &mut &'a str, n: usize) -> Result<u64, ParseError> {
+    fn read_exact_str<'a>(inp: &mut &'a str, n: usize) -> Result<&'a str, ParseError> {
         if inp.len() < n { return Err(ParseError::InvalidStructure); }
         if !inp[..n].bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
-        let v = inp[..n].parse::<u64>().map_err(|_| ParseError::Overflow)?;
+        let s = &inp[..n];
         *inp = &inp[n..];
-        Ok(v)
+        Ok(s)
     }
 
-    fn read_frac<'a>(inp: &mut &'a str, n: usize, greedy: bool) -> Result<u32, ParseError> {
+    fn read_frac_str<'a>(inp: &mut &'a str, n: usize, greedy: bool) -> Result<&'a str, ParseError> {
         if greedy {
             let count = inp.bytes().take(n).take_while(|b| b.is_ascii_digit()).count();
             if count == 0 { return Err(ParseError::InvalidStructure); }
-            let v = inp[..count].parse::<u32>().unwrap();
+            let s = &inp[..count];
             *inp = &inp[count..];
-            Ok(v * 10u32.pow(7 - count as u32))
+            Ok(s)
         } else {
-            read_exact(inp, n).map(|v| v as u32 * 10u32.pow(7 - n as u32))
-        }
-    }
-
-    fn last_with_frac(s: &str, sep: char) -> Result<(u32, u32), ParseError> {
-        if let Some(dot) = s.find(sep) {
-            let int_s = &s[..dot];
-            let sv = if int_s.is_empty() { 0u32 } else { parse_uint(int_s)? as u32 };
-            Ok((sv, parse_frac(&s[dot + 1..])?))
-        } else {
-            if s.is_empty() { return Err(ParseError::InvalidStructure); }
-            Ok((parse_uint(s)? as u32, 0))
+            read_exact_str(inp, n)
         }
     }
 }
