@@ -455,29 +455,55 @@ mod parse_impl {
     fn parse_component_uint(s: Option<&str>) -> Result<u64, ParseError> {
         match s {
             None | Some("") => Ok(0),
-            Some(s) => parse_uint(s),
+            Some(s) => parse_uint(s).map_err(Into::into),
         }
     }
 
     fn parse_component_frac(s: Option<&str>) -> Result<u32, ParseError> {
         match s {
             None => Ok(0),
-            Some(s) => parse_frac(s),
+            Some(s) => parse_frac(s).map_err(Into::into),
         }
     }
 
     // ── Low-level validators ──────────────────────────────────────────────────
 
-    fn parse_uint(s: &str) -> Result<u64, ParseError> {
-        if s.is_empty() { return Err(ParseError::InvalidStructure); }
-        if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
-        s.parse::<u64>().map_err(|_| ParseError::Overflow)
+    #[derive(Debug, PartialEq, Eq)]
+    enum UintError { Empty, NonDigit, Overflow }
+
+    impl From<UintError> for ParseError {
+        fn from(e: UintError) -> Self {
+            match e {
+                UintError::Empty    => ParseError::InvalidStructure,
+                UintError::NonDigit => ParseError::InvalidCharacter,
+                UintError::Overflow => ParseError::Overflow,
+            }
+        }
     }
 
-    fn parse_frac(s: &str) -> Result<u32, ParseError> {
-        if s.is_empty() { return Err(ParseError::InvalidStructure); }
-        if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(ParseError::InvalidCharacter); }
-        if s.len() > 7 { return Err(ParseError::Overflow); }
+    #[derive(Debug, PartialEq, Eq)]
+    enum FracError { Empty, NonDigit, TooLong }
+
+    impl From<FracError> for ParseError {
+        fn from(e: FracError) -> Self {
+            match e {
+                FracError::Empty    => ParseError::InvalidStructure,
+                FracError::NonDigit => ParseError::InvalidCharacter,
+                FracError::TooLong  => ParseError::Overflow,
+            }
+        }
+    }
+
+    fn parse_uint(s: &str) -> Result<u64, UintError> {
+        if s.is_empty() { return Err(UintError::Empty); }
+        if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(UintError::NonDigit); }
+        s.parse::<u64>().map_err(|_| UintError::Overflow)
+    }
+
+    fn parse_frac(s: &str) -> Result<u32, FracError> {
+        if s.is_empty() { return Err(FracError::Empty); }
+        if !s.bytes().all(|b| b.is_ascii_digit()) { return Err(FracError::NonDigit); }
+        if s.len() > 7 { return Err(FracError::TooLong); }
         let v = s.parse::<u32>().unwrap();
         Ok(v * 10u32.pow(7 - s.len() as u32))
     }
