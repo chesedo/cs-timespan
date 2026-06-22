@@ -20,3 +20,7 @@ criterion = "0.8"
 [[bench]]
 name = "format"
 harness = false
+
+[[bench]]
+name = "parse"
+harness = false
