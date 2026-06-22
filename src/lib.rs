@@ -199,7 +199,7 @@ impl TimeSpan {
     /// assert_eq!(ts.to_string_fmt("hh"),         "10");
     /// ```
     pub fn to_string_fmt(&self, fmt: &str) -> String {
-        format_timespan(*self, fmt, '.')
+        self.to_string_fmt_with_culture(fmt, Locale::en)
     }
 
     /// Formats using the decimal separator of the given locale.
