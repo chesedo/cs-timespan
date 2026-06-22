@@ -41,10 +41,22 @@ pub enum TimeSpanStyles {
     AssumeNegative,
 }
 
-/// Subset of cultures relevant to `TimeSpan` formatting and parsing.
+/// Cultures relevant to `TimeSpan` formatting and parsing.
 ///
-/// Only cultures that affect the decimal/group separator are included,
-/// since those are the only axes along which `TimeSpan` output varies.
+/// The C# `TimeSpan` test suite references exactly four culture tags —
+/// `CultureInfo.InvariantCulture`, `en-US`, `fr-FR`, and `hr-HR` — which
+/// are represented as the four named variants below. The only property that
+/// varies between cultures for `TimeSpan` is the decimal separator used in
+/// fractional seconds (`.` vs `,`); all other separators are fixed.
+///
+/// For any culture not explicitly listed, use [`Other`], which applies a `.`
+/// decimal separator. For unlisted cultures that require `,`, use [`FrFR`]
+/// or [`HrHR`] — they are functionally identical to any other comma-separator
+/// culture (e.g. `de-DE`, `es-ES`).
+///
+/// [`Other`]: Culture::Other
+/// [`FrFR`]: Culture::FrFR
+/// [`HrHR`]: Culture::HrHR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Culture {
     /// `CultureInfo.InvariantCulture` — decimal separator is `.`
@@ -56,7 +68,7 @@ pub enum Culture {
     HrHR,
     /// French (`fr-FR`) — decimal separator is `,`
     FrFR,
-    /// Any other culture not listed above — decimal separator defaults to `.`
+    /// Any culture not explicitly listed above — decimal separator defaults to `.`
     Other,
 }
 
