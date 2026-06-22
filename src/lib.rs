@@ -116,7 +116,7 @@ impl TimeSpan {
     /// assert_eq!(TimeSpan::parse("00:00:60"), Err(ParseError::Overflow));
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
-        parse_impl::parse_lenient(s, '.')
+        Self::parse_with_culture(s, Locale::en)
     }
 
     /// Parses using the decimal separator of the given locale.
@@ -139,18 +139,11 @@ impl TimeSpan {
 
     // ── Strict parsing (mirrors ParseExact / TryParseExact) ───────────────────
     pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
-        parse_impl::parse_exact(s, fmt, '.')
+        Self::parse_exact_with_culture(s, fmt, Locale::en)
     }
 
     pub fn parse_exact_any(s: &str, formats: &[&str]) -> Result<Self, ParseError> {
-        let mut last = ParseError::InvalidFormat;
-        for fmt in formats {
-            match Self::parse_exact(s, fmt) {
-                Ok(ts) => return Ok(ts),
-                Err(e) => last = e,
-            }
-        }
-        Err(last)
+        Self::parse_exact_any_with_culture(s, formats, Locale::en)
     }
 
     pub fn parse_exact_with_culture(
