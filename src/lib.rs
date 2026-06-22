@@ -56,6 +56,17 @@ pub enum ParseError {
     Overflow,
 }
 
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidFormat => f.write_str("input was not in a recognised TimeSpan format"),
+            Self::Overflow => f.write_str("TimeSpan value is outside the representable range"),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
+
 /// Mirrors `System.Globalization.TimeSpanStyles`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TimeSpanStyles {
