@@ -60,6 +60,24 @@ fn parse_exact_constant_format_d_dot_hms() {
     }
 }
 
+// C# TimeSpanParse.cs ParseTime (line 1384): `if (_ch == ':')` makes the second colon
+// and seconds component optional — "hh:mm" and "d.hh:mm" are valid "c" inputs.
+#[test]
+fn parse_exact_c_hm_no_seconds() {
+    for fmt in ["c", "t", "T"] {
+        assert_eq!(
+            TimeSpan::parse_exact("01:02", fmt),
+            Ok(ts3(1, 2, 0)),
+            "format={fmt:?}",
+        );
+        assert_eq!(
+            TimeSpan::parse_exact("1.02:03", fmt),
+            Ok(ts4(1, 2, 3, 0)),
+            "format={fmt:?}",
+        );
+    }
+}
+
 #[test]
 fn parse_exact_constant_format_negative_with_millis() {
     for fmt in ["c", "t", "T"] {
@@ -276,14 +294,17 @@ fn parse_exact_invalid_garbage() {
 
 #[test]
 fn parse_exact_invalid_wrong_separator() {
-    // '?' replaces a colon → wrong colon count → InvalidStructure
+    // '?' replaces the first colon → day_hour = "1?59", no dot, hours = "1?59"
+    // → non-digit in hours field → InvalidCharacter
     assert_eq!(
         TimeSpan::parse_exact("1?59:02", "c"),
-        Err(ParseError::InvalidStructure),
+        Err(ParseError::InvalidCharacter),
     );
+    // '?' replaces the second colon → minutes = "59?02", non-digit → InvalidCharacter
+    // (seconds are optional since C# ParseTime line 1384; the '?' lands in minutes)
     assert_eq!(
         TimeSpan::parse_exact("1:59?02", "c"),
-        Err(ParseError::InvalidStructure),
+        Err(ParseError::InvalidCharacter),
     );
     // '?' replaces the decimal separator → appears as non-digit inside a component
     assert_eq!(

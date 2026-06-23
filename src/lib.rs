@@ -728,7 +728,7 @@ mod parse_impl {
         }
     }
 
-    /// "c"/"t"/"T": `[-][d.]hh:mm:ss[.fffffff]`
+    /// "c"/"t"/"T": `[-][d.]hh:mm[:ss[.fffffff]]`
     fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() {
@@ -743,14 +743,21 @@ mod parse_impl {
         };
 
         let min = it.next().ok_or(ParseError::InvalidStructure)?;
-        let sec_frac = it.next().ok_or(ParseError::InvalidStructure)?;
-        let (sec_s, frac_s) = match sec_frac.split_once('.') {
-            Some((s, f)) => (s, Some(f)),
-            None => (sec_frac, None),
+
+        // C# ParseTime (TimeSpanParse.cs line 1384): `if (_ch == ':')` makes the
+        // second colon and seconds optional — "hh:mm" is a valid "c" input.
+        let (sec_s, frac_s) = match it.next() {
+            None => ("", None),
+            Some(sf) => match sf.split_once('.') {
+                Some((s, f)) => (s, Some(f)),
+                None => {
+                    if sf.is_empty() {
+                        return Err(ParseError::InvalidStructure);
+                    }
+                    (sf, None)
+                }
+            },
         };
-        if sec_s.is_empty() && frac_s.is_none() {
-            return Err(ParseError::InvalidStructure);
-        }
 
         let mut b = Builder::new(neg);
         b.days = days_str;
