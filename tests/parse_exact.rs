@@ -261,6 +261,21 @@ fn parse_exact_custom_fff_uppercase_optional_digits() {
     );
 }
 
+// C# TryParseByFormat (TimeSpanParse.cs line 1317): ParseExactDigits return value is
+// ignored for 'F' specifiers — zero matched digits is valid (fraction defaults to 0).
+#[test]
+fn parse_exact_custom_uppercase_f_zero_digits_accepted() {
+    // Format has fractional part but input ends after the separator — fraction = 0
+    assert_eq!(
+        TimeSpan::parse_exact("5.", r"d\.FFFFFFF"),
+        Ok(ts4(5, 0, 0, 0)),
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("1:02:03.", r"h\:mm\:ss\.FFFFFFF"),
+        Ok(ts3(1, 2, 3)),
+    );
+}
+
 #[test]
 fn parse_exact_custom_percent_specifiers() {
     assert_eq!(TimeSpan::parse_exact("3", "%d"), Ok(ts5(3, 0, 0, 0, 0)));

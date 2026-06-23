@@ -977,7 +977,17 @@ mod parse_impl {
             }
             'F' => {
                 dup!(b.frac);
-                b.frac = Some(read_greedy_str(inp, n)?);
+                // C# TryParseByFormat (TimeSpanParse.cs line 1317): ParseExactDigits
+                // return value is ignored for 'F' — zero digits is valid (frac = 0).
+                let count = inp
+                    .bytes()
+                    .take(n)
+                    .take_while(|b| b.is_ascii_digit())
+                    .count();
+                if count > 0 {
+                    b.frac = Some(&inp[..count]);
+                }
+                *inp = &inp[count..];
             }
             _ => return Err(ParseError::InvalidStructure),
         }
