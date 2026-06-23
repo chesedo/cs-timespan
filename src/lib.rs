@@ -867,12 +867,17 @@ mod parse_impl {
         let mut inp = input;
         let mut b = Builder::new(false);
 
-        while let Some(ch) = it.next() {
-            match ch {
-                '%' => {
-                    let spec = it.next().ok_or(ParseError::InvalidStructure)?;
-                    apply_spec(spec, 1, &mut inp, &mut b)?;
+        while let Some(mut ch) = it.next() {
+            // C# TryParseByFormat: '%' consumes itself then re-enters the full switch
+            // (including ParseRepeatPattern) on the next character — it is a transparent
+            // pass-through. '%' at end-of-format or '%%' are both errors.
+            if ch == '%' {
+                ch = it.next().ok_or(ParseError::InvalidStructure)?;
+                if ch == '%' {
+                    return Err(ParseError::InvalidStructure);
                 }
+            }
+            match ch {
                 'd' | 'h' | 'm' | 's' | 'f' | 'F' => {
                     let mut n = 1;
                     while it.peek() == Some(&ch) {

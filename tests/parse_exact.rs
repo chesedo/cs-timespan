@@ -286,6 +286,22 @@ fn parse_exact_custom_percent_specifiers() {
     assert_eq!(TimeSpan::parse_exact("3", "%F"), Ok(ts5(0, 0, 0, 0, 300)));
 }
 
+// C# TryParseByFormat (TimeSpanParse.cs): after consuming '%', the next character is
+// re-fed into the full switch including ParseRepeatPattern, so '%' is a transparent
+// pass-through that enables run-length specifiers and other token types.
+#[test]
+fn parse_exact_custom_percent_passthrough() {
+    // %dd → same as dd (exact 2-digit days)
+    assert_eq!(TimeSpan::parse_exact("05", "%dd"), Ok(ts4(5, 0, 0, 0)),);
+    // %'literal' → match the quoted literal
+    assert_eq!(
+        TimeSpan::parse_exact("minutes", r#"%"minutes""#),
+        Ok(ts4(0, 0, 0, 0)),
+    );
+    // %\X → match the escaped literal character
+    assert_eq!(TimeSpan::parse_exact(":", r"%\:"), Ok(ts4(0, 0, 0, 0)),);
+}
+
 // ── ParseExact_Invalid — FormatException cases ────────────────────────────────
 
 #[test]
