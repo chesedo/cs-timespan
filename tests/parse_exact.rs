@@ -93,7 +93,10 @@ fn parse_exact_g_hm() {
 
 #[test]
 fn parse_exact_g_negative_hm() {
-    assert_eq!(TimeSpan::parse_exact("-12:34", "g"), Ok(neg(ts3(12, 34, 0))));
+    assert_eq!(
+        TimeSpan::parse_exact("-12:34", "g"),
+        Ok(neg(ts3(12, 34, 0)))
+    );
 }
 
 #[test]
@@ -254,18 +257,12 @@ fn parse_exact_custom_percent_specifiers() {
 
 #[test]
 fn parse_exact_invalid_empty_string() {
-    assert_eq!(
-        TimeSpan::parse_exact("", "c"),
-        Err(ParseError::Empty),
-    );
+    assert_eq!(TimeSpan::parse_exact("", "c"), Err(ParseError::Empty),);
 }
 
 #[test]
 fn parse_exact_invalid_lone_minus() {
-    assert_eq!(
-        TimeSpan::parse_exact("-", "c"),
-        Err(ParseError::Empty),
-    );
+    assert_eq!(TimeSpan::parse_exact("-", "c"), Err(ParseError::Empty),);
 }
 
 #[test]
@@ -300,7 +297,7 @@ fn parse_exact_c_rejects_d_colon_form() {
     // "c" format uses dot separator for days; colon-separated days is only valid in "g"
     assert_eq!(
         TimeSpan::parse_exact("1:12:24:02", "c"),
-        Err(ParseError::InvalidStructure),
+        Err(ParseError::InvalidCharacter),
     );
 }
 
@@ -490,7 +487,12 @@ fn parse_exact_invalid_literal_mismatch() {
 fn parse_exact_with_styles_none_matches_parse_exact() {
     // TimeSpanStyles::None produces identical output to parse_exact.
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Locale::en, TimeSpanStyles::None),
+        TimeSpan::parse_exact_with_styles(
+            "1:02:03",
+            r"h\:mm\:ss",
+            Locale::en,
+            TimeSpanStyles::None
+        ),
         Ok(ts4(0, 1, 2, 3)),
     );
 }
@@ -499,7 +501,12 @@ fn parse_exact_with_styles_none_matches_parse_exact() {
 fn parse_exact_with_styles_assume_negative_custom_format() {
     // Without a leading '-' in the input, AssumeNegative flips the sign.
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Locale::en, TimeSpanStyles::AssumeNegative),
+        TimeSpan::parse_exact_with_styles(
+            "1:02:03",
+            r"h\:mm\:ss",
+            Locale::en,
+            TimeSpanStyles::AssumeNegative
+        ),
         Ok(neg(ts4(0, 1, 2, 3))),
     );
 }
@@ -507,7 +514,12 @@ fn parse_exact_with_styles_assume_negative_custom_format() {
 #[test]
 fn parse_exact_with_styles_assume_negative_standard_format() {
     assert_eq!(
-        TimeSpan::parse_exact_with_styles("01:02:03", "c", Locale::en, TimeSpanStyles::AssumeNegative),
+        TimeSpan::parse_exact_with_styles(
+            "01:02:03",
+            "c",
+            Locale::en,
+            TimeSpanStyles::AssumeNegative
+        ),
         Ok(neg(ts4(0, 1, 2, 3))),
     );
 }

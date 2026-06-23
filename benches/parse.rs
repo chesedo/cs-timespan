@@ -7,50 +7,50 @@ use cs_timespan::{Locale, TimeSpan};
 // Each tuple is (label, input_str).
 fn lenient_inputs() -> [(&'static str, &'static str); 6] {
     [
-        ("hms",              "12:24:02"),
-        ("hms_frac",         "12:24:02.999"),
-        ("d_dot_hms_frac",   "1.12:24:02.999"),
+        ("hms", "12:24:02"),
+        ("hms_frac", "12:24:02.999"),
+        ("d_dot_hms_frac", "1.12:24:02.999"),
         ("d_colon_hms_frac", "6:12:14:45.348"),
-        ("bare_days",        "10675199"),
-        ("negative",         "-01.07:45:16.9990000"),
+        ("bare_days", "10675199"),
+        ("negative", "-01.07:45:16.9990000"),
     ]
 }
 
 fn constant_inputs() -> [(&'static str, &'static str); 5] {
     [
-        ("hms",          "12:24:02"),
-        ("d_dot_hms",    "1.12:24:02"),
-        ("with_frac",    "1.12:24:02.9990000"),
-        ("negative",     "-01.07:45:16.9990000"),
-        ("max",          "10675199.02:48:05.4775807"),
+        ("hms", "12:24:02"),
+        ("d_dot_hms", "1.12:24:02"),
+        ("with_frac", "1.12:24:02.9990000"),
+        ("negative", "-01.07:45:16.9990000"),
+        ("max", "10675199.02:48:05.4775807"),
     ]
 }
 
 fn g_inputs() -> [(&'static str, &'static str); 5] {
     [
-        ("days_only",  "42"),
-        ("hm",         "12:34"),
-        ("hms_frac",   "12:24:02.999"),
+        ("days_only", "42"),
+        ("hm", "12:34"),
+        ("hms_frac", "12:24:02.999"),
         ("d_hms_frac", "1:12:24:02.999"),
-        ("negative",   "-01:07:45:16.999"),
+        ("negative", "-01:07:45:16.999"),
     ]
 }
 
 fn g_upper_inputs() -> [(&'static str, &'static str); 4] {
     [
-        ("zero",     "0:00:00:00.0000000"),
-        ("common",   "1:12:24:02.9990000"),
-        ("max",      "10675199:02:48:05.4775807"),
+        ("zero", "0:00:00:00.0000000"),
+        ("common", "1:12:24:02.9990000"),
+        ("max", "10675199:02:48:05.4775807"),
         ("negative", "-1:07:45:16.9990000"),
     ]
 }
 
 fn custom_inputs() -> [(&'static str, &'static str); 4] {
     [
-        ("dd_h_m_s",     "12.23:32:43"),
-        ("ddd_h_m_s_fff","012.23:32:43.893"),
-        ("d_hh_mm_ss",   "12.05:02:03"),
-        ("literal",      "12:34 minutes"),
+        ("dd_h_m_s", "12.23:32:43"),
+        ("ddd_h_m_s_fff", "012.23:32:43.893"),
+        ("d_hh_mm_ss", "12.05:02:03"),
+        ("literal", "12:34 minutes"),
     ]
 }
 
@@ -118,10 +118,10 @@ fn bench_parse_exact_g_upper(c: &mut Criterion) {
 fn bench_parse_exact_custom(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_exact_custom");
     let fmts: [(&str, &str); 4] = [
-        ("dd_h_m_s",      r"dd\.h\:m\:s"),
+        ("dd_h_m_s", r"dd\.h\:m\:s"),
         ("ddd_h_m_s_fff", r"ddd\.h\:m\:s\.fff"),
-        ("d_hh_mm_ss",    r"d\.hh\:mm\:ss"),
-        ("literal",       r#"mm\:ss\ "minutes""#),
+        ("d_hh_mm_ss", r"d\.hh\:mm\:ss"),
+        ("literal", r#"mm\:ss\ "minutes""#),
     ];
     for ((name, s), (_, fmt)) in custom_inputs().iter().zip(fmts.iter()) {
         group.bench_with_input(BenchmarkId::new(*fmt, *name), s, |b, s| {
@@ -138,9 +138,9 @@ fn bench_parse_exact_any(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_exact_any");
     let inputs = [
         // First format matches immediately.
-        ("first_match",  "12:24:02"),
+        ("first_match", "12:24:02"),
         // Last format matches (tries "c" and "g" first, fails, then "G").
-        ("last_match",   "1:12:24:02.9990000"),
+        ("last_match", "1:12:24:02.9990000"),
     ];
     for (name, s) in inputs {
         group.bench_with_input(BenchmarkId::new("c|g|G", name), s, |b, s| {

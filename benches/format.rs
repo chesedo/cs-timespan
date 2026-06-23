@@ -55,11 +55,9 @@ fn bench_format_g_upper(c: &mut Criterion) {
 fn bench_format_custom(c: &mut Criterion) {
     let mut group = c.benchmark_group("format_custom");
     for (name, ts) in inputs() {
-        group.bench_with_input(
-            BenchmarkId::new(r"dddddd\.ss", name),
-            &ts,
-            |b, ts| b.iter(|| ts.to_string_fmt(r"dddddd\.ss")),
-        );
+        group.bench_with_input(BenchmarkId::new(r"dddddd\.ss", name), &ts, |b, ts| {
+            b.iter(|| ts.to_string_fmt(r"dddddd\.ss"))
+        });
     }
     group.finish();
 }

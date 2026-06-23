@@ -69,7 +69,10 @@ fn parse_valid_trailing_whitespace() {
 
 #[test]
 fn parse_valid_surrounding_whitespace() {
-    assert_eq!(TimeSpan::parse("     12:24:02      "), Ok(ts5(0, 12, 24, 2, 0)));
+    assert_eq!(
+        TimeSpan::parse("     12:24:02      "),
+        Ok(ts5(0, 12, 24, 2, 0))
+    );
 }
 
 #[test]
@@ -269,12 +272,18 @@ fn parse_invalid_lone_minus() {
 
 #[test]
 fn parse_invalid_garbage() {
-    assert_eq!(TimeSpan::parse("garbage"), Err(ParseError::InvalidCharacter));
+    assert_eq!(
+        TimeSpan::parse("garbage"),
+        Err(ParseError::InvalidCharacter)
+    );
 }
 
 #[test]
 fn parse_invalid_date_like_string() {
-    assert_eq!(TimeSpan::parse("12/12/12"), Err(ParseError::InvalidCharacter));
+    assert_eq!(
+        TimeSpan::parse("12/12/12"),
+        Err(ParseError::InvalidCharacter)
+    );
 }
 
 #[test]
@@ -284,24 +293,42 @@ fn parse_invalid_trailing_colon() {
 
 #[test]
 fn parse_invalid_negative_component() {
-    assert_eq!(TimeSpan::parse("00:00:-01"), Err(ParseError::InvalidCharacter));
+    assert_eq!(
+        TimeSpan::parse("00:00:-01"),
+        Err(ParseError::InvalidCharacter)
+    );
 }
 
 #[test]
 fn parse_invalid_embedded_null_chars() {
-    assert_eq!(TimeSpan::parse("\x0012:34:56"), Err(ParseError::InvalidCharacter));
-    assert_eq!(TimeSpan::parse("1\x0002:34:56"), Err(ParseError::InvalidCharacter));
-    assert_eq!(TimeSpan::parse("12\x00:34:56"), Err(ParseError::InvalidCharacter));
+    assert_eq!(
+        TimeSpan::parse("\x0012:34:56"),
+        Err(ParseError::InvalidCharacter)
+    );
+    assert_eq!(
+        TimeSpan::parse("1\x0002:34:56"),
+        Err(ParseError::InvalidCharacter)
+    );
+    assert_eq!(
+        TimeSpan::parse("12\x00:34:56"),
+        Err(ParseError::InvalidCharacter)
+    );
 }
 
 #[test]
 fn parse_invalid_double_colon() {
-    assert_eq!(TimeSpan::parse("00:00::00"), Err(ParseError::InvalidStructure));
+    assert_eq!(
+        TimeSpan::parse("00:00::00"),
+        Err(ParseError::InvalidStructure)
+    );
 }
 
 #[test]
 fn parse_invalid_trailing_colon_after_seconds() {
-    assert_eq!(TimeSpan::parse("00:00:00:"), Err(ParseError::InvalidStructure));
+    assert_eq!(
+        TimeSpan::parse("00:00:00:"),
+        Err(ParseError::InvalidStructure)
+    );
 }
 
 #[test]
@@ -325,10 +352,7 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
 
 #[test]
 fn parse_overflow_too_many_fractional_digits() {
-    assert_eq!(
-        TimeSpan::parse("1:1:1.99999999"),
-        Err(ParseError::Overflow),
-    );
+    assert_eq!(TimeSpan::parse("1:1:1.99999999"), Err(ParseError::Overflow),);
 }
 
 #[test]

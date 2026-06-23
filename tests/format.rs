@@ -157,7 +157,11 @@ fn format_constant_large_value() {
 #[test]
 fn format_constant_zero() {
     for fmt in ["c", "t", "T"] {
-        assert_eq!(TimeSpan::ZERO.to_string_fmt(fmt), "00:00:00", "format={fmt:?}");
+        assert_eq!(
+            TimeSpan::ZERO.to_string_fmt(fmt),
+            "00:00:00",
+            "format={fmt:?}"
+        );
     }
 }
 
@@ -208,13 +212,21 @@ fn format_constant_min_value() {
 #[test]
 fn format_constant_hms() {
     for fmt in ["c", "t", "T"] {
-        assert_eq!(hms(1, 2, 3).to_string_fmt(fmt), "01:02:03", "format={fmt:?}");
+        assert_eq!(
+            hms(1, 2, 3).to_string_fmt(fmt),
+            "01:02:03",
+            "format={fmt:?}"
+        );
         assert_eq!(
             neg(hms(1, 2, 3)).to_string_fmt(fmt),
             "-01:02:03",
             "format={fmt:?}",
         );
-        assert_eq!(hms(12, 34, 56).to_string_fmt(fmt), "12:34:56", "format={fmt:?}");
+        assert_eq!(
+            hms(12, 34, 56).to_string_fmt(fmt),
+            "12:34:56",
+            "format={fmt:?}"
+        );
     }
 }
 
@@ -267,7 +279,10 @@ fn format_display_equals_c_format() {
     assert_eq!(input().to_string(), input().to_string_fmt("c"));
     assert_eq!(TimeSpan::ZERO.to_string(), "00:00:00");
     assert_eq!(TimeSpan::MAX_VALUE.to_string(), "10675199.02:48:05.4775807");
-    assert_eq!(TimeSpan::MIN_VALUE.to_string(), "-10675199.02:48:05.4775808");
+    assert_eq!(
+        TimeSpan::MIN_VALUE.to_string(),
+        "-10675199.02:48:05.4775808"
+    );
 }
 
 // ── Standard format "g" (general short, culture-sensitive) ────────────────────

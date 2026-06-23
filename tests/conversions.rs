@@ -36,7 +36,10 @@ fn from_duration_sub_tick_rounds_down() {
 #[test]
 fn from_duration_large_saturates_to_max() {
     // Duration::MAX vastly exceeds TimeSpan::MAX_VALUE; must saturate.
-    assert_eq!(TimeSpan::from(std::time::Duration::MAX), TimeSpan::MAX_VALUE);
+    assert_eq!(
+        TimeSpan::from(std::time::Duration::MAX),
+        TimeSpan::MAX_VALUE
+    );
 }
 
 // ── TryFrom<TimeSpan> for std::time::Duration ─────────────────────────────────
