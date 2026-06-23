@@ -506,11 +506,26 @@ mod parse_impl {
         if !s.bytes().all(|b| b.is_ascii_digit()) {
             return Err(FracError::NonDigit);
         }
-        if s.len() > 7 {
+        let total = s.len();
+        if total <= 7 {
+            let v = s.bytes().fold(0u32, |acc, b| acc * 10 + (b - b'0') as u32);
+            return Ok(v * 10u32.pow(7 - total as u32));
+        }
+        // C# NormalizeAndValidateFraction (TimeSpanParse.cs line 148): fractions longer than
+        // 7 digits are accepted only when leading zeros push the significant digits into range.
+        // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
+        let zeroes = s.bytes().take_while(|&b| b == b'0').count();
+        if zeroes == 0 {
             return Err(FracError::TooLong);
         }
-        let v = s.bytes().fold(0u32, |acc, b| acc * 10 + (b - b'0') as u32);
-        Ok(v * 10u32.pow(7 - s.len() as u32))
+        if zeroes > 7 {
+            return Ok(0);
+        }
+        let num = s[zeroes..]
+            .bytes()
+            .fold(0u64, |acc, b| acc * 10 + (b - b'0') as u64);
+        let power = 10u64.pow((total - 7) as u32);
+        Ok(((num + power / 2) / power) as u32)
     }
 
     // ── Low-level validators ──────────────────────────────────────────────────

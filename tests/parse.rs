@@ -350,9 +350,24 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
 
 // ── Parse_Invalid_TestData — OverflowException cases ─────────────────────────
 
+// C# TimeSpanParse.cs NormalizeAndValidateFraction (line 148): fractions longer than 7 digits
+// are accepted when they have enough leading zeros that the significant value fits in 7 digits;
+// the value is rounded to the nearest tick. Fractions with no leading zeros and > 7 digits
+// overflow because their integer value exceeds MaxFraction (9_999_999).
 #[test]
 fn parse_overflow_too_many_fractional_digits() {
-    assert_eq!(TimeSpan::parse("1:1:1.99999999"), Err(ParseError::Overflow),);
+    // No leading zeros: value (99999999) > MaxFraction → Overflow
+    assert_eq!(TimeSpan::parse("1:1:1.99999999"), Err(ParseError::Overflow));
+}
+
+#[test]
+fn parse_frac_leading_zeros_beyond_7_rounds_to_nearest_tick() {
+    // ".00000005" (8 digits, 7 leading zeros): 0.5 ticks → rounds up to 1
+    assert_eq!(TimeSpan::parse("0:0:0.00000005").unwrap().ticks(), 1);
+    // ".00000050" (8 digits, 6 leading zeros): 5.0 ticks → rounds to 5
+    assert_eq!(TimeSpan::parse("0:0:0.00000050").unwrap().ticks(), 5);
+    // ".000000000" (9 digits, all zeros): rounds to 0
+    assert_eq!(TimeSpan::parse("0:0:0.000000000").unwrap().ticks(), 0);
 }
 
 #[test]
