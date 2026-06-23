@@ -245,6 +245,20 @@ fn parse_exact_custom_literal_word_single_quoted() {
     );
 }
 
+// C# DateTimeParse.TryParseQuoteString (DateTimeParse.cs line 4600): '\' inside a
+// quoted literal is an escape — '\X' appends X, allowing the quote char to be embedded.
+#[test]
+fn parse_exact_custom_backslash_escape_inside_quote() {
+    // Format: "5\:00" (double-quoted literal, '\:' inside the quote = literal ':')
+    // matches input "5:00" and leaves no specifiers → 0 ticks.
+    assert_eq!(
+        TimeSpan::parse_exact("5:00", r#""5\:00""#),
+        Ok(ts4(0, 0, 0, 0)),
+    );
+    // Backslash-escape of the quote char itself: '5\'s' → literal "5's"
+    assert_eq!(TimeSpan::parse_exact("5's", "'5\\'s'"), Ok(ts4(0, 0, 0, 0)),);
+}
+
 #[test]
 fn parse_exact_custom_fff_lowercase() {
     assert_eq!(
@@ -374,6 +388,21 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
 fn parse_exact_invalid_empty_format_string() {
     assert_eq!(
         TimeSpan::parse_exact("00:00:00", ""),
+        Err(ParseError::InvalidStructure),
+    );
+}
+
+// C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
+// TryParseByFormat when format.Length >= 2; a single non-standard letter is an
+// invalid format specifier.
+#[test]
+fn parse_exact_invalid_single_char_custom_format() {
+    assert_eq!(
+        TimeSpan::parse_exact("5", "d"),
+        Err(ParseError::InvalidStructure),
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("5", "h"),
         Err(ParseError::InvalidStructure),
     );
 }

@@ -863,6 +863,11 @@ mod parse_impl {
 
     /// Custom format specifier parsing.
     fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
+        // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
+        // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
+        if fmt.chars().count() < 2 {
+            return Err(ParseError::InvalidStructure);
+        }
         let mut it = fmt.chars().peekable();
         let mut inp = input;
         let mut b = Builder::new(false);
@@ -905,12 +910,18 @@ mod parse_impl {
                 q @ ('\'' | '"') => {
                     let mut lit = String::new();
                     let mut closed = false;
-                    for c in it.by_ref() {
-                        if c == q {
+                    // C# DateTimeParse.TryParseQuoteString (DateTimeParse.cs line 4600):
+                    // '\' inside a quoted literal escapes the next character.
+                    while let Some(c) = it.next() {
+                        if c == '\\' {
+                            let escaped = it.next().ok_or(ParseError::InvalidStructure)?;
+                            lit.push(escaped);
+                        } else if c == q {
                             closed = true;
                             break;
+                        } else {
+                            lit.push(c);
                         }
-                        lit.push(c);
                     }
                     if !closed {
                         return Err(ParseError::InvalidStructure);
