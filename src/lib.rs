@@ -658,7 +658,6 @@ mod parse_impl {
 
     /// "c"/"t"/"T": `[-][d.]hh:mm:ss[.fffffff]`
     fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
-        if s.trim().is_empty() { return Err(ParseError::Empty); }
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::Empty); }
 
@@ -688,7 +687,6 @@ mod parse_impl {
 
     /// "g": `[-][d:]h:mm:ss[.FFFFFFF]`
     fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
-        if s.trim().is_empty() { return Err(ParseError::Empty); }
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::Empty); }
 
@@ -735,7 +733,6 @@ mod parse_impl {
 
     /// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
     fn parse_g_upper(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
-        if s.trim().is_empty() { return Err(ParseError::Empty); }
         let (neg, s) = strip_neg(s.trim());
         if s.is_empty() { return Err(ParseError::Empty); }
 
