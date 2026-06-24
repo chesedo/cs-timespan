@@ -2,6 +2,7 @@ pub use num_format::Locale;
 
 mod fmt;
 mod parse;
+pub use fmt::FormatError;
 pub use parse::{ParseError, TimeSpanStyles};
 
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
@@ -24,7 +25,7 @@ pub use parse::{ParseError, TimeSpanStyles};
 /// // Use a locale-sensitive format with a French locale (comma separator)
 /// use cs_timespan::Locale;
 /// assert_eq!(
-///     ts.to_string_fmt_with_culture("g", Locale::fr),
+///     ts.to_string_fmt_with_culture("g", Locale::fr).unwrap(),
 ///     "1:2:03:04,56789",
 /// );
 /// ```
@@ -172,14 +173,15 @@ impl TimeSpan {
     /// for fractional seconds, `%x` for a single specifier, `\x` for a literal.
     ///
     /// ```
-    /// use cs_timespan::TimeSpan;
+    /// use cs_timespan::{TimeSpan, FormatError};
     /// let ts = TimeSpan::from_ticks(1_234_567_890_123);
     ///
-    /// assert_eq!(ts.to_string_fmt("c"),          "1.10:17:36.7890123");
-    /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm"), "1.10:17");
-    /// assert_eq!(ts.to_string_fmt("hh"),         "10");
+    /// assert_eq!(ts.to_string_fmt("c").unwrap(),          "1.10:17:36.7890123");
+    /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm").unwrap(), "1.10:17");
+    /// assert_eq!(ts.to_string_fmt("hh").unwrap(),         "10");
+    /// assert_eq!(ts.to_string_fmt("x"), Err(FormatError::UnknownSpecifier));
     /// ```
-    pub fn to_string_fmt(&self, fmt: &str) -> String {
+    pub fn to_string_fmt(&self, fmt: &str) -> Result<String, FormatError> {
         self.to_string_fmt_with_culture(fmt, Locale::en)
     }
 
@@ -193,13 +195,17 @@ impl TimeSpan {
     /// let ts = TimeSpan::from_ticks(1_234_567_890_123);
     ///
     /// // French locale uses ',' as the decimal separator in "g" and "G"
-    /// assert_eq!(ts.to_string_fmt_with_culture("g", Locale::fr), "1:10:17:36,7890123");
-    /// assert_eq!(ts.to_string_fmt_with_culture("G", Locale::fr), "1:10:17:36,7890123");
+    /// assert_eq!(ts.to_string_fmt_with_culture("g", Locale::fr).unwrap(), "1:10:17:36,7890123");
+    /// assert_eq!(ts.to_string_fmt_with_culture("G", Locale::fr).unwrap(), "1:10:17:36,7890123");
     ///
     /// // "c" is always invariant regardless of locale
-    /// assert_eq!(ts.to_string_fmt_with_culture("c", Locale::fr), "1.10:17:36.7890123");
+    /// assert_eq!(ts.to_string_fmt_with_culture("c", Locale::fr).unwrap(), "1.10:17:36.7890123");
     /// ```
-    pub fn to_string_fmt_with_culture(&self, fmt: &str, locale: Locale) -> String {
+    pub fn to_string_fmt_with_culture(
+        &self,
+        fmt: &str,
+        locale: Locale,
+    ) -> Result<String, FormatError> {
         fmt::format_timespan(self.ticks, fmt, decimal_sep(locale))
     }
 }
@@ -207,7 +213,8 @@ impl TimeSpan {
 /// Default `Display` uses the invariant `"c"` format: `[-][d.]hh:mm:ss[.fffffff]`
 impl std::fmt::Display for TimeSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&fmt::format_timespan(self.ticks, "c", '.'))
+        // "c" format is built from Components directly — no error path.
+        f.write_str(&fmt::format_constant(self.ticks))
     }
 }
 

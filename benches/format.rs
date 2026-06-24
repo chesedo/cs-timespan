@@ -16,7 +16,7 @@ fn bench_format_constant(c: &mut Criterion) {
     let mut group = c.benchmark_group("format_constant");
     for (name, ts) in inputs() {
         group.bench_with_input(BenchmarkId::new("c", name), &ts, |b, ts| {
-            b.iter(|| ts.to_string_fmt("c"))
+            b.iter(|| ts.to_string_fmt("c").unwrap())
         });
     }
     group.finish();
@@ -36,7 +36,7 @@ fn bench_format_g(c: &mut Criterion) {
     let mut group = c.benchmark_group("format_g");
     for (name, ts) in inputs() {
         group.bench_with_input(BenchmarkId::new("g/invariant", name), &ts, |b, ts| {
-            b.iter(|| ts.to_string_fmt_with_culture("g", Locale::en))
+            b.iter(|| ts.to_string_fmt_with_culture("g", Locale::en).unwrap())
         });
     }
     group.finish();
@@ -46,7 +46,7 @@ fn bench_format_g_upper(c: &mut Criterion) {
     let mut group = c.benchmark_group("format_G");
     for (name, ts) in inputs() {
         group.bench_with_input(BenchmarkId::new("G/invariant", name), &ts, |b, ts| {
-            b.iter(|| ts.to_string_fmt_with_culture("G", Locale::en))
+            b.iter(|| ts.to_string_fmt_with_culture("G", Locale::en).unwrap())
         });
     }
     group.finish();
@@ -56,7 +56,7 @@ fn bench_format_custom(c: &mut Criterion) {
     let mut group = c.benchmark_group("format_custom");
     for (name, ts) in inputs() {
         group.bench_with_input(BenchmarkId::new(r"dddddd\.ss", name), &ts, |b, ts| {
-            b.iter(|| ts.to_string_fmt(r"dddddd\.ss"))
+            b.iter(|| ts.to_string_fmt(r"dddddd\.ss").unwrap())
         });
     }
     group.finish();

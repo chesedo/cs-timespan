@@ -2,6 +2,40 @@ use std::fmt::Write as FmtWrite;
 
 use crate::TimeSpan;
 
+/// Error returned when a custom format string is invalid.
+///
+/// Mirrors the `FormatException` C# throws from `TimeSpan.ToString(string)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormatError {
+    /// A specifier is repeated more times than allowed
+    /// (`d` > 8, `h`/`m`/`s` > 2, `f`/`F` > 7).
+    RepeatTooLong,
+    /// An unrecognised character appeared in the custom format string.
+    UnknownSpecifier,
+    /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
+    UnclosedQuote,
+    /// `%%` or a lone `%` at end of format string.
+    InvalidPercent,
+    /// A trailing `\` at end of format string with no character to escape.
+    TrailingEscape,
+}
+
+impl std::fmt::Display for FormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RepeatTooLong => f.write_str("format specifier repeated too many times"),
+            Self::UnknownSpecifier => f.write_str("unrecognised character in format string"),
+            Self::UnclosedQuote => f.write_str("quoted literal is not closed"),
+            Self::InvalidPercent => {
+                f.write_str("'%' must be followed by a single specifier, not '%'")
+            }
+            Self::TrailingEscape => f.write_str("'\\' at end of format string"),
+        }
+    }
+}
+
+impl std::error::Error for FormatError {}
+
 struct Components {
     negative: bool,
     days: u64,
@@ -96,7 +130,7 @@ impl Components {
         out
     }
 
-    fn format_custom(&self, fmt: &str) -> String {
+    fn format_custom(&self, fmt: &str) -> Result<String, FormatError> {
         let chars: Vec<char> = fmt.chars().collect();
         let mut out = String::new();
         let mut i = 0;
@@ -130,11 +164,11 @@ impl Components {
                     }
                     i += 1; // skip closing quote
                 }
-                _ => todo!("custom format char: {:?}", chars[i]),
+                _ => return Err(FormatError::UnknownSpecifier),
             }
         }
 
-        out
+        Ok(out)
     }
 
     /// Emit one component according to its specifier character and repeat count `n`.
@@ -155,19 +189,23 @@ impl Components {
             's' => fmt_component(n, self.seconds),
             'f' => fmt_frac(self.sub_sec_ticks, n, false),
             'F' => fmt_frac(self.sub_sec_ticks, n, true),
-            _ => todo!("unknown custom specifier: {}", ch),
+            _ => unreachable!("format_specifier called with invalid char: {ch:?}"),
         }
     }
 }
 
-pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> String {
+pub(crate) fn format_constant(ticks: i64) -> String {
+    Components::from_ticks(ticks).format_constant()
+}
+
+pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> Result<String, FormatError> {
     let c = Components::from_ticks(ticks);
-    match fmt {
+    Ok(match fmt {
         "c" | "t" | "T" => c.format_constant(),
         "g" => c.format_general_short(sep),
         "G" => c.format_general_long(sep),
-        _ => c.format_custom(fmt),
-    }
+        _ => c.format_custom(fmt)?,
+    })
 }
 
 /// `n == 1` → no leading zero; `n > 1` → zero-padded to 2 digits.

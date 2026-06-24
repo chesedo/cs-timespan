@@ -49,77 +49,77 @@ fn input() -> TimeSpan {
 
 #[test]
 fn format_custom_percent_d() {
-    assert_eq!(input().to_string_fmt("%d"), "142");
+    assert_eq!(input().to_string_fmt("%d").unwrap(), "142");
 }
 
 #[test]
 fn format_custom_dd() {
-    assert_eq!(input().to_string_fmt("dd"), "142");
+    assert_eq!(input().to_string_fmt("dd").unwrap(), "142");
 }
 
 #[test]
 fn format_custom_dddddd_padded() {
-    assert_eq!(input().to_string_fmt("dddddd"), "000142");
+    assert_eq!(input().to_string_fmt("dddddd").unwrap(), "000142");
 }
 
 #[test]
 fn format_custom_percent_h() {
-    assert_eq!(input().to_string_fmt("%h"), "21");
+    assert_eq!(input().to_string_fmt("%h").unwrap(), "21");
 }
 
 #[test]
 fn format_custom_hh() {
-    assert_eq!(input().to_string_fmt("hh"), "21");
+    assert_eq!(input().to_string_fmt("hh").unwrap(), "21");
 }
 
 #[test]
 fn format_custom_percent_m() {
-    assert_eq!(input().to_string_fmt("%m"), "21");
+    assert_eq!(input().to_string_fmt("%m").unwrap(), "21");
 }
 
 #[test]
 fn format_custom_mm() {
-    assert_eq!(input().to_string_fmt("mm"), "21");
+    assert_eq!(input().to_string_fmt("mm").unwrap(), "21");
 }
 
 #[test]
 fn format_custom_percent_s() {
-    assert_eq!(input().to_string_fmt("%s"), "18");
+    assert_eq!(input().to_string_fmt("%s").unwrap(), "18");
 }
 
 #[test]
 fn format_custom_ss() {
-    assert_eq!(input().to_string_fmt("ss"), "18");
+    assert_eq!(input().to_string_fmt("ss").unwrap(), "18");
 }
 
 #[test]
 fn format_custom_fractional_lowercase_f() {
     // Lowercase f* always emits exactly N digits (no trailing-zero trimming)
-    assert_eq!(input().to_string_fmt("%f"), "9");
-    assert_eq!(input().to_string_fmt("ff"), "91");
-    assert_eq!(input().to_string_fmt("fff"), "910");
-    assert_eq!(input().to_string_fmt("ffff"), "9101");
-    assert_eq!(input().to_string_fmt("fffff"), "91011");
-    assert_eq!(input().to_string_fmt("ffffff"), "910111");
-    assert_eq!(input().to_string_fmt("fffffff"), "9101112");
+    assert_eq!(input().to_string_fmt("%f").unwrap(), "9");
+    assert_eq!(input().to_string_fmt("ff").unwrap(), "91");
+    assert_eq!(input().to_string_fmt("fff").unwrap(), "910");
+    assert_eq!(input().to_string_fmt("ffff").unwrap(), "9101");
+    assert_eq!(input().to_string_fmt("fffff").unwrap(), "91011");
+    assert_eq!(input().to_string_fmt("ffffff").unwrap(), "910111");
+    assert_eq!(input().to_string_fmt("fffffff").unwrap(), "9101112");
 }
 
 #[test]
 fn format_custom_fractional_uppercase_f() {
     // Uppercase F* trims trailing zeros
-    assert_eq!(input().to_string_fmt("%F"), "9");
-    assert_eq!(input().to_string_fmt("FF"), "91");
-    assert_eq!(input().to_string_fmt("FFF"), "91"); // "910" → trim trailing 0 → "91"
-    assert_eq!(input().to_string_fmt("FFFF"), "9101");
-    assert_eq!(input().to_string_fmt("FFFFF"), "91011");
-    assert_eq!(input().to_string_fmt("FFFFFF"), "910111");
-    assert_eq!(input().to_string_fmt("FFFFFFF"), "9101112");
+    assert_eq!(input().to_string_fmt("%F").unwrap(), "9");
+    assert_eq!(input().to_string_fmt("FF").unwrap(), "91");
+    assert_eq!(input().to_string_fmt("FFF").unwrap(), "91"); // "910" → trim trailing 0 → "91"
+    assert_eq!(input().to_string_fmt("FFFF").unwrap(), "9101");
+    assert_eq!(input().to_string_fmt("FFFFF").unwrap(), "91011");
+    assert_eq!(input().to_string_fmt("FFFFFF").unwrap(), "910111");
+    assert_eq!(input().to_string_fmt("FFFFFFF").unwrap(), "9101112");
 }
 
 #[test]
 fn format_custom_composite_dd_dot_ss() {
     // Escape sequences: \. is a literal dot
-    assert_eq!(input().to_string_fmt(r"dd\.ss"), "142.18");
+    assert_eq!(input().to_string_fmt(r"dd\.ss").unwrap(), "142.18");
 }
 
 #[test]
@@ -127,7 +127,9 @@ fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     // Custom format specifiers are not culture-sensitive
     for culture in [Locale::en, Locale::en_GB, Locale::fr, Locale::hr] {
         assert_eq!(
-            input().to_string_fmt_with_culture(r"dd\.ss", culture),
+            input()
+                .to_string_fmt_with_culture(r"dd\.ss", culture)
+                .unwrap(),
             "142.18",
             "culture={culture:?}",
         );
@@ -136,7 +138,7 @@ fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
 
 #[test]
 fn format_custom_dddddd_dot_ss() {
-    assert_eq!(input().to_string_fmt(r"dddddd\.ss"), "000142.18");
+    assert_eq!(input().to_string_fmt(r"dddddd\.ss").unwrap(), "000142.18");
 }
 
 // ── Standard format "c" / "t" / "T" (constant, culture-invariant) ─────────────
@@ -147,7 +149,7 @@ fn format_custom_dddddd_dot_ss() {
 fn format_constant_large_value() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            input().to_string_fmt(fmt),
+            input().to_string_fmt(fmt).unwrap(),
             "142.21:21:18.9101112",
             "format={fmt:?}",
         );
@@ -158,7 +160,7 @@ fn format_constant_large_value() {
 fn format_constant_zero() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            TimeSpan::ZERO.to_string_fmt(fmt),
+            TimeSpan::ZERO.to_string_fmt(fmt).unwrap(),
             "00:00:00",
             "format={fmt:?}"
         );
@@ -169,7 +171,7 @@ fn format_constant_zero() {
 fn format_constant_one_tick() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            TimeSpan::from_ticks(1).to_string_fmt(fmt),
+            TimeSpan::from_ticks(1).to_string_fmt(fmt).unwrap(),
             "00:00:00.0000001",
             "format={fmt:?}",
         );
@@ -180,7 +182,7 @@ fn format_constant_one_tick() {
 fn format_constant_minus_one_tick() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            TimeSpan::from_ticks(-1).to_string_fmt(fmt),
+            TimeSpan::from_ticks(-1).to_string_fmt(fmt).unwrap(),
             "-00:00:00.0000001",
             "format={fmt:?}",
         );
@@ -191,7 +193,7 @@ fn format_constant_minus_one_tick() {
 fn format_constant_max_value() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            TimeSpan::MAX_VALUE.to_string_fmt(fmt),
+            TimeSpan::MAX_VALUE.to_string_fmt(fmt).unwrap(),
             "10675199.02:48:05.4775807",
             "format={fmt:?}",
         );
@@ -202,7 +204,7 @@ fn format_constant_max_value() {
 fn format_constant_min_value() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            TimeSpan::MIN_VALUE.to_string_fmt(fmt),
+            TimeSpan::MIN_VALUE.to_string_fmt(fmt).unwrap(),
             "-10675199.02:48:05.4775808",
             "format={fmt:?}",
         );
@@ -213,17 +215,17 @@ fn format_constant_min_value() {
 fn format_constant_hms() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            hms(1, 2, 3).to_string_fmt(fmt),
+            hms(1, 2, 3).to_string_fmt(fmt).unwrap(),
             "01:02:03",
             "format={fmt:?}"
         );
         assert_eq!(
-            neg(hms(1, 2, 3)).to_string_fmt(fmt),
+            neg(hms(1, 2, 3)).to_string_fmt(fmt).unwrap(),
             "-01:02:03",
             "format={fmt:?}",
         );
         assert_eq!(
-            hms(12, 34, 56).to_string_fmt(fmt),
+            hms(12, 34, 56).to_string_fmt(fmt).unwrap(),
             "12:34:56",
             "format={fmt:?}"
         );
@@ -235,7 +237,7 @@ fn format_constant_dhms_overflow_hours() {
     // 12 days + 34 hours normalises to 13 days 10 hours
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            dhms(12, 34, 56, 23).to_string_fmt(fmt),
+            dhms(12, 34, 56, 23).to_string_fmt(fmt).unwrap(),
             "13.10:56:23",
             "format={fmt:?}",
         );
@@ -246,12 +248,12 @@ fn format_constant_dhms_overflow_hours() {
 fn format_constant_dhmsm() {
     for fmt in ["c", "t", "T"] {
         assert_eq!(
-            dhmsm(12, 34, 56, 23, 45).to_string_fmt(fmt),
+            dhmsm(12, 34, 56, 23, 45).to_string_fmt(fmt).unwrap(),
             "13.10:56:23.0450000",
             "format={fmt:?}",
         );
         assert_eq!(
-            dhmsm(0, 23, 59, 59, 999).to_string_fmt(fmt),
+            dhmsm(0, 23, 59, 59, 999).to_string_fmt(fmt).unwrap(),
             "23:59:59.9990000",
             "format={fmt:?}",
         );
@@ -264,7 +266,7 @@ fn format_constant_is_culture_invariant() {
     for fmt in ["c", "t", "T"] {
         for culture in [Locale::en, Locale::en_GB, Locale::fr, Locale::hr] {
             assert_eq!(
-                input().to_string_fmt_with_culture(fmt, culture),
+                input().to_string_fmt_with_culture(fmt, culture).unwrap(),
                 "142.21:21:18.9101112",
                 "format={fmt:?} culture={culture:?}",
             );
@@ -276,7 +278,7 @@ fn format_constant_is_culture_invariant() {
 
 #[test]
 fn format_display_equals_c_format() {
-    assert_eq!(input().to_string(), input().to_string_fmt("c"));
+    assert_eq!(input().to_string(), input().to_string_fmt("c").unwrap());
     assert_eq!(TimeSpan::ZERO.to_string(), "00:00:00");
     assert_eq!(TimeSpan::MAX_VALUE.to_string(), "10675199.02:48:05.4775807");
     assert_eq!(
@@ -290,7 +292,7 @@ fn format_display_equals_c_format() {
 #[test]
 fn format_g_invariant_large_value() {
     assert_eq!(
-        input().to_string_fmt_with_culture("g", Locale::en),
+        input().to_string_fmt_with_culture("g", Locale::en).unwrap(),
         "142:21:21:18.9101112",
     );
 }
@@ -312,7 +314,7 @@ fn format_g_invariant_common_values() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("g", Locale::en),
+            ts.to_string_fmt_with_culture("g", Locale::en).unwrap(),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -338,7 +340,7 @@ fn format_g_fr_fr_uses_comma_separator() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("g", Locale::fr),
+            ts.to_string_fmt_with_culture("g", Locale::fr).unwrap(),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -351,7 +353,7 @@ fn format_g_fr_fr_uses_comma_separator() {
 #[test]
 fn format_g_upper_invariant_large_value() {
     assert_eq!(
-        input().to_string_fmt_with_culture("G", Locale::en),
+        input().to_string_fmt_with_culture("G", Locale::en).unwrap(),
         "142:21:21:18.9101112",
     );
 }
@@ -373,7 +375,7 @@ fn format_g_upper_invariant_common_values() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("G", Locale::en),
+            ts.to_string_fmt_with_culture("G", Locale::en).unwrap(),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
@@ -399,7 +401,7 @@ fn format_g_upper_fr_fr_uses_comma_separator() {
     ];
     for (ts, expected) in cases {
         assert_eq!(
-            ts.to_string_fmt_with_culture("G", Locale::fr),
+            ts.to_string_fmt_with_culture("G", Locale::fr).unwrap(),
             *expected,
             "TimeSpan({:?})",
             ts.ticks(),
