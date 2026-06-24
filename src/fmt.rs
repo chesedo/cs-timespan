@@ -144,10 +144,7 @@ impl Components {
                     if chars[i] == '%' {
                         return Err(FormatError::InvalidPercent);
                     }
-                    if !matches!(chars[i], 'd' | 'h' | 'm' | 's' | 'f' | 'F') {
-                        return Err(FormatError::UnknownSpecifier);
-                    }
-                    out.push_str(&self.format_specifier(chars[i], 1));
+                    out.push_str(&self.format_specifier(chars[i], 1)?);
                     i += 1;
                 }
                 '%' => return Err(FormatError::InvalidPercent),
@@ -163,7 +160,7 @@ impl Components {
                     if n > max {
                         return Err(FormatError::RepeatTooLong);
                     }
-                    out.push_str(&self.format_specifier(ch, n));
+                    out.push_str(&self.format_specifier(ch, n)?);
                     i += n;
                 }
                 // `\x` — escape: next char is a literal.
@@ -202,8 +199,8 @@ impl Components {
     }
 
     /// Emit one component according to its specifier character and repeat count `n`.
-    fn format_specifier(&self, ch: char, n: usize) -> String {
-        match ch {
+    fn format_specifier(&self, ch: char, n: usize) -> Result<String, FormatError> {
+        Ok(match ch {
             'd' => {
                 let s = self.days.to_string();
                 if s.len() < n {
@@ -219,8 +216,8 @@ impl Components {
             's' => fmt_component(n, self.seconds),
             'f' => fmt_frac(self.sub_sec_ticks, n, false),
             'F' => fmt_frac(self.sub_sec_ticks, n, true),
-            _ => unreachable!("format_specifier called with invalid char: {ch:?}"),
-        }
+            _ => return Err(FormatError::UnknownSpecifier),
+        })
     }
 }
 
