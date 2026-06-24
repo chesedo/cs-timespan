@@ -103,7 +103,8 @@ fn format_custom_invalid_frac_repeat_too_long() {
 
 #[test]
 fn format_custom_percent_unknown_specifier() {
-    // C# FormatCustomized: %x where x is not a valid specifier char throws FormatException.
+    // C# TimeSpanFormat.cs FormatCustomized line ~419: %x recurses into FormatCustomized
+    // with just 'x'; 'x' hits the default case (line ~451) which throws FormatException.
     assert_eq!(
         input().to_string_fmt("%x"),
         Err(FormatError::UnknownSpecifier),
