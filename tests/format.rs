@@ -14,7 +14,7 @@
 // - C# `null` format and `"c"` / `"t"` / `"T"` all produce identical output;
 //   the null case maps to `Display` (`ts.to_string()`).
 
-use cs_timespan::{Locale, TimeSpan};
+use cs_timespan::{FormatError, Locale, TimeSpan};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,45 @@ fn format_custom_dd() {
 #[test]
 fn format_custom_dddddd_padded() {
     assert_eq!(input().to_string_fmt("dddddd").unwrap(), "000142");
+}
+
+#[test]
+fn format_custom_invalid_d_repeat_too_long() {
+    // C# TimeSpanFormat.cs FormatCustomized: repeat count > 8 for 'd' throws FormatException.
+    assert_eq!(
+        input().to_string_fmt("ddddddddd"), // 9 d's
+        Err(FormatError::RepeatTooLong),
+    );
+}
+
+#[test]
+fn format_custom_invalid_hms_repeat_too_long() {
+    // C# TimeSpanFormat.cs FormatCustomized: repeat count > 2 for 'h', 'm', 's' throws FormatException.
+    assert_eq!(
+        input().to_string_fmt("hhh"), // 3 h's
+        Err(FormatError::RepeatTooLong),
+    );
+    assert_eq!(
+        input().to_string_fmt("mmm"), // 3 m's
+        Err(FormatError::RepeatTooLong),
+    );
+    assert_eq!(
+        input().to_string_fmt("sss"), // 3 s's
+        Err(FormatError::RepeatTooLong),
+    );
+}
+
+#[test]
+fn format_custom_invalid_frac_repeat_too_long() {
+    // C# TimeSpanFormat.cs FormatCustomized: repeat count > 7 for 'f'/'F' throws FormatException.
+    assert_eq!(
+        input().to_string_fmt("ffffffff"), // 8 f's
+        Err(FormatError::RepeatTooLong),
+    );
+    assert_eq!(
+        input().to_string_fmt("FFFFFFFF"), // 8 F's
+        Err(FormatError::RepeatTooLong),
+    );
 }
 
 #[test]

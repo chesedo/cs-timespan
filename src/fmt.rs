@@ -144,8 +144,17 @@ impl Components {
                     i += 1;
                 }
                 // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars
+                // C# FormatCustomized (TimeSpanFormat.cs): repeat > max throws FormatException.
                 ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
                     let n = run_length(&chars, i, ch);
+                    let max = match ch {
+                        'd' => 8,
+                        'h' | 'm' | 's' => 2,
+                        _ => 7,
+                    };
+                    if n > max {
+                        return Err(FormatError::RepeatTooLong);
+                    }
                     out.push_str(&self.format_specifier(ch, n));
                     i += n;
                 }
