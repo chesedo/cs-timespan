@@ -155,10 +155,14 @@ impl Components {
                     i += 2;
                 }
                 // `'...'` or `"..."` — quoted literal string
+                // C# ParseQuoteString (TimeSpanFormat.cs): '\' inside quotes escapes next char.
                 '\'' | '"' => {
                     let q = chars[i];
                     i += 1;
                     while i < chars.len() && chars[i] != q {
+                        if chars[i] == '\\' && i + 1 < chars.len() {
+                            i += 1;
+                        }
                         out.push(chars[i]);
                         i += 1;
                     }

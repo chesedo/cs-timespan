@@ -123,6 +123,19 @@ fn format_custom_composite_dd_dot_ss() {
 }
 
 #[test]
+fn format_custom_backslash_escape_inside_quote() {
+    // C# TimeSpanFormat.cs FormatCustomized / ParseQuoteString: inside a quoted
+    // literal, '\' escapes the next character — '\:' inside quotes emits ':'.
+    // E.g. format "'h\:m'" with value 1h2m → "h:m" (not "h\:m").
+    assert_eq!(
+        TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR + 2 * TimeSpan::TICKS_PER_MINUTE)
+            .to_string_fmt(r#"'h\:m'"#)
+            .unwrap(),
+        "h:m",
+    );
+}
+
+#[test]
 fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     // Custom format specifiers are not culture-sensitive
     for culture in [Locale::en, Locale::en_GB, Locale::fr, Locale::hr] {
