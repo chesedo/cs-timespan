@@ -102,6 +102,15 @@ fn format_custom_invalid_frac_repeat_too_long() {
 }
 
 #[test]
+fn format_custom_percent_unknown_specifier() {
+    // C# FormatCustomized: %x where x is not a valid specifier char throws FormatException.
+    assert_eq!(
+        input().to_string_fmt("%x"),
+        Err(FormatError::UnknownSpecifier),
+    );
+}
+
+#[test]
 fn format_custom_percent_h() {
     assert_eq!(input().to_string_fmt("%h").unwrap(), "21");
 }

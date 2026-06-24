@@ -144,6 +144,9 @@ impl Components {
                     if chars[i] == '%' {
                         return Err(FormatError::InvalidPercent);
                     }
+                    if !matches!(chars[i], 'd' | 'h' | 'm' | 's' | 'f' | 'F') {
+                        return Err(FormatError::UnknownSpecifier);
+                    }
                     out.push_str(&self.format_specifier(chars[i], 1));
                     i += 1;
                 }
