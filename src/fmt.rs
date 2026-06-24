@@ -12,6 +12,9 @@ struct Components {
     sub_sec_ticks: u32,
 }
 
+// `write!` on a `String` via `fmt::Write for String` is infallible: the only
+// failure mode is allocation, which panics rather than returning `Err` in std.
+// All `.unwrap()` calls in this impl are therefore unreachable in practice.
 impl Components {
     fn from_ticks(ticks: i64) -> Self {
         let abs = ticks.unsigned_abs();
