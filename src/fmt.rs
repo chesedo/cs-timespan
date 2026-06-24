@@ -12,9 +12,6 @@ struct Components {
     sub_sec_ticks: u32,
 }
 
-// `write!` on a `String` via `fmt::Write for String` is infallible: the only
-// failure mode is allocation, which panics rather than returning `Err` in std.
-// All `.unwrap()` calls in this impl are therefore unreachable in practice.
 impl Components {
     fn from_ticks(ticks: i64) -> Self {
         let abs = ticks.unsigned_abs();
@@ -43,16 +40,16 @@ impl Components {
             out.push('-');
         }
         if self.days > 0 {
-            write!(out, "{}.", self.days).unwrap();
+            write!(out, "{}.", self.days).unwrap(); // write! to String is infallible
         }
         write!(
             out,
             "{:02}:{:02}:{:02}",
             self.hours, self.minutes, self.seconds
         )
-        .unwrap();
+        .unwrap(); // write! to String is infallible
         if self.sub_sec_ticks > 0 {
-            write!(out, ".{:07}", self.sub_sec_ticks).unwrap();
+            write!(out, ".{:07}", self.sub_sec_ticks).unwrap(); // write! to String is infallible
         }
         out
     }
@@ -64,17 +61,17 @@ impl Components {
             out.push('-');
         }
         if self.days > 0 {
-            write!(out, "{}:", self.days).unwrap();
+            write!(out, "{}:", self.days).unwrap(); // write! to String is infallible
         }
         write!(
             out,
             "{}:{:02}:{:02}",
             self.hours, self.minutes, self.seconds
         )
-        .unwrap();
+        .unwrap(); // write! to String is infallible
         if self.sub_sec_ticks > 0 {
             // FFFFFFF — trim trailing zeros
-            write!(out, "{}{}", sep, fmt_frac(self.sub_sec_ticks, 7, true)).unwrap();
+            write!(out, "{}{}", sep, fmt_frac(self.sub_sec_ticks, 7, true)).unwrap(); // write! to String is infallible
         }
         out
     }
@@ -95,7 +92,7 @@ impl Components {
             sep,
             fmt_frac(self.sub_sec_ticks, 7, false),
         )
-        .unwrap();
+        .unwrap(); // write! to String is infallible
         out
     }
 
@@ -147,7 +144,7 @@ impl Components {
                 let s = self.days.to_string();
                 if s.len() < n {
                     let mut out = String::new();
-                    write!(out, "{:0>width$}", s, width = n).unwrap();
+                    write!(out, "{:0>width$}", s, width = n).unwrap(); // write! to String is infallible
                     out
                 } else {
                     s
@@ -177,16 +174,16 @@ pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> String {
 fn fmt_component(n: usize, val: u32) -> String {
     let mut out = String::new();
     if n == 1 {
-        write!(out, "{}", val).unwrap();
+        write!(out, "{}", val).unwrap(); // write! to String is infallible
     } else {
-        write!(out, "{:02}", val).unwrap();
+        write!(out, "{:02}", val).unwrap(); // write! to String is infallible
     }
     out
 }
 
 fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
     let mut full = String::new();
-    write!(full, "{:07}", sub_sec_ticks).unwrap();
+    write!(full, "{:07}", sub_sec_ticks).unwrap(); // write! to String is infallible
     let s = &full[..n];
     if trim {
         s.trim_end_matches('0').to_string()
