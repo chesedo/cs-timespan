@@ -1,0 +1,640 @@
+use crate::TimeSpan;
+
+/// Mirrors the two distinct failure modes C# separates into
+/// `FormatException` (bad syntax) and `OverflowException` (out of range),
+/// with the format case split into more actionable variants.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParseError {
+    /// Input is empty or whitespace-only, or reduces to nothing after
+    /// stripping a leading `-`.
+    Empty,
+    /// A non-digit character appeared where only digits are valid, or the
+    /// input contains a null byte.
+    InvalidCharacter,
+    /// The decimal separator in the input does not match the locale
+    /// (e.g. `'.'` when the locale uses `','`).
+    WrongSeparator,
+    /// The component structure is unrecognised: wrong number of colons or
+    /// parts, missing required separator, duplicate specifiers, etc.
+    InvalidStructure,
+    /// The value is syntactically valid but outside the representable range
+    /// (`OverflowException`).
+    Overflow,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => f.write_str("input is empty"),
+            Self::InvalidCharacter => f.write_str("input contains an invalid character"),
+            Self::WrongSeparator => f.write_str("decimal separator does not match the locale"),
+            Self::InvalidStructure => f.write_str("input has an unrecognised component structure"),
+            Self::Overflow => f.write_str("TimeSpan value is outside the representable range"),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// Mirrors `System.Globalization.TimeSpanStyles`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimeSpanStyles {
+    #[default]
+    None,
+    /// Treat the parsed interval as negative even without a leading `-`.
+    AssumeNegative,
+}
+
+// ── Builder ───────────────────────────────────────────────────────────────────
+
+#[derive(Default)]
+struct Builder<'a> {
+    neg: bool,
+    days: Option<&'a str>,
+    hours: Option<&'a str>,
+    minutes: Option<&'a str>,
+    seconds: Option<&'a str>,
+    frac: Option<&'a str>,
+}
+
+impl<'a> Builder<'a> {
+    fn new(neg: bool) -> Self {
+        Self {
+            neg,
+            ..Default::default()
+        }
+    }
+
+    fn build(self) -> Result<TimeSpan, ParseError> {
+        let days = parse_component_uint(self.days)?;
+        let h = parse_component_uint(self.hours)? as u32;
+        let m = parse_component_uint(self.minutes)? as u32;
+        let sv = parse_component_uint(self.seconds)? as u32;
+        let frac = parse_component_frac(self.frac)?;
+        if h >= 24 || m >= 60 || sv >= 60 {
+            return Err(ParseError::Overflow);
+        }
+        build_ticks(self.neg, days, h, m, sv, frac)
+    }
+}
+
+fn parse_component_uint(s: Option<&str>) -> Result<u64, ParseError> {
+    match s {
+        None | Some("") => Ok(0),
+        Some(s) => parse_uint(s).map_err(Into::into),
+    }
+}
+
+fn parse_component_frac(s: Option<&str>) -> Result<u32, ParseError> {
+    match s {
+        None => Ok(0),
+        Some(s) => parse_frac(s).map_err(Into::into),
+    }
+}
+
+fn parse_uint(s: &str) -> Result<u64, UintError> {
+    if s.is_empty() {
+        return Err(UintError::Empty);
+    }
+    if !s.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(UintError::NonDigit);
+    }
+    s.parse::<u64>().map_err(|_| UintError::Overflow)
+}
+
+fn parse_frac(s: &str) -> Result<u32, FracError> {
+    if s.is_empty() {
+        return Err(FracError::Empty);
+    }
+    if !s.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(FracError::NonDigit);
+    }
+    let total = s.len();
+    if total <= 7 {
+        let v = s.bytes().fold(0u32, |acc, b| acc * 10 + (b - b'0') as u32);
+        return Ok(v * 10u32.pow(7 - total as u32));
+    }
+    // C# NormalizeAndValidateFraction (TimeSpanParse.cs line 148): fractions longer than
+    // 7 digits are accepted only when leading zeros push the significant digits into range.
+    // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
+    let zeroes = s.bytes().take_while(|&b| b == b'0').count();
+    if zeroes == 0 {
+        return Err(FracError::TooLong);
+    }
+    if zeroes > 7 {
+        return Ok(0);
+    }
+    let num = s[zeroes..]
+        .bytes()
+        .fold(0u64, |acc, b| acc * 10 + (b - b'0') as u64);
+    let power = 10u64.pow((total - 7) as u32);
+    Ok(((num + power / 2) / power) as u32)
+}
+
+// ── Low-level validators ──────────────────────────────────────────────────────
+
+#[derive(Debug, PartialEq, Eq)]
+enum UintError {
+    Empty,
+    NonDigit,
+    Overflow,
+}
+
+impl From<UintError> for ParseError {
+    fn from(e: UintError) -> Self {
+        match e {
+            UintError::Empty => ParseError::InvalidStructure,
+            UintError::NonDigit => ParseError::InvalidCharacter,
+            UintError::Overflow => ParseError::Overflow,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FracError {
+    Empty,
+    NonDigit,
+    TooLong,
+}
+
+impl From<FracError> for ParseError {
+    fn from(e: FracError) -> Self {
+        match e {
+            FracError::Empty => ParseError::InvalidStructure,
+            FracError::NonDigit => ParseError::InvalidCharacter,
+            FracError::TooLong => ParseError::Overflow,
+        }
+    }
+}
+
+fn build_ticks(
+    neg: bool,
+    days: u64,
+    h: u32,
+    m: u32,
+    s: u32,
+    frac: u32,
+) -> Result<TimeSpan, ParseError> {
+    let ticks = (days as u128)
+        .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
+        .and_then(|t| t.checked_add(h as u128 * TimeSpan::TICKS_PER_HOUR as u128))
+        .and_then(|t| t.checked_add(m as u128 * TimeSpan::TICKS_PER_MINUTE as u128))
+        .and_then(|t| t.checked_add(s as u128 * TimeSpan::TICKS_PER_SECOND as u128))
+        .and_then(|t| t.checked_add(frac as u128))
+        .ok_or(ParseError::Overflow)?;
+    if neg {
+        const ABS_MIN: u128 = (i64::MAX as u128) + 1;
+        if ticks > ABS_MIN {
+            return Err(ParseError::Overflow);
+        } else if ticks == ABS_MIN {
+            return Ok(TimeSpan::from_ticks(i64::MIN));
+        }
+        Ok(TimeSpan::from_ticks(-(ticks as i64)))
+    } else {
+        if ticks > i64::MAX as u128 {
+            return Err(ParseError::Overflow);
+        }
+        Ok(TimeSpan::from_ticks(ticks as i64))
+    }
+}
+
+// ── Lenient parser (parse / parse_with_culture) ───────────────────────────────
+
+/// Lenient: `[-]{d | [d.]h:mm[:ss[.FFFFFFF]] | d:h:mm:ss[.FFFFFFF]}`
+pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(input.trim());
+    if s.is_empty() {
+        return Err(ParseError::Empty);
+    }
+
+    let mut it = s.split(':');
+    let head = it.next().ok_or(ParseError::InvalidStructure)?;
+    let p1 = it.next();
+    let p2 = it.next();
+    let p3 = it.next();
+    if it.next().is_some() {
+        return Err(ParseError::InvalidStructure);
+    }
+
+    // No colons → bare days only (d.anything requires a colon for the time part).
+    if p1.is_none() {
+        if head.contains('.') {
+            return Err(ParseError::InvalidStructure);
+        }
+        let mut b = Builder::new(neg);
+        b.days = Some(head);
+        return b.build();
+    }
+
+    // The first segment may carry a days prefix: `d.h` or just `h`.
+    let (days_str, first_s) = match head.split_once('.') {
+        Some((d, h)) => {
+            if d.is_empty() || h.is_empty() {
+                return Err(ParseError::InvalidStructure);
+            }
+            (Some(d), h)
+        }
+        None => {
+            if head.is_empty() {
+                return Err(ParseError::InvalidStructure);
+            }
+            (None, head)
+        }
+    };
+
+    // The fractional part is always in the last colon-split component (p3 > p2 > p1).
+    // Pre-parse it once so the match arms only deal with structure.
+    let last = p3.or(p2).or(p1).unwrap(); // p1 always Some — early-returned above
+    let (last_int, frac_s) = match last.split_once(sep) {
+        Some((i, f)) => (i, Some(f)),
+        None => {
+            if sep != '.' && last.contains('.') {
+                return Err(ParseError::WrongSeparator);
+            }
+            (last, None)
+        }
+    };
+    if last_int.is_empty() && frac_s.is_none() {
+        return Err(ParseError::InvalidStructure);
+    }
+
+    let mut b = Builder::new(neg);
+    b.frac = frac_s;
+    b.days = days_str; // dot-prefix days; overridden by colon-prefix cases below
+
+    // p1/p2/p3 still carry the raw (pre-split) strings; Some(_) discards the last
+    // component since last_int already holds its parsed integer portion.
+    match (days_str.is_some(), p1, p2, p3) {
+        // h:m[.frac] or d.h:m[.frac] — one colon
+        (_, Some(_), None, None) => {
+            b.hours = Some(first_s);
+            b.minutes = Some(last_int);
+        }
+        // d.h:m:s[.frac] — two colons with days-dot
+        (true, Some(mid), Some(_), None) => {
+            if mid.is_empty() {
+                return Err(ParseError::InvalidStructure);
+            }
+            b.hours = Some(first_s);
+            b.minutes = Some(mid);
+            b.seconds = Some(last_int);
+        }
+        // h:m:s[.frac] or d:h:m[.frac] when first > 23 — two colons, no days-dot
+        (false, Some(mid), Some(_), None) => {
+            if mid.is_empty() {
+                return Err(ParseError::InvalidStructure);
+            }
+            let first_val = parse_component_uint(Some(first_s))?;
+            if first_val > 23 {
+                b.days = Some(first_s);
+                b.hours = Some(mid);
+                b.minutes = Some(last_int);
+            } else {
+                b.hours = Some(first_s);
+                b.minutes = Some(mid);
+                b.seconds = Some(last_int);
+            }
+        }
+        // d:h:m:s[.frac] — three colons, no days-dot
+        (false, Some(mid1), Some(mid2), Some(_)) => {
+            if mid1.is_empty() || mid2.is_empty() {
+                return Err(ParseError::InvalidStructure);
+            }
+            b.days = Some(first_s);
+            b.hours = Some(mid1);
+            b.minutes = Some(mid2);
+            b.seconds = Some(last_int);
+        }
+        _ => return Err(ParseError::InvalidStructure),
+    }
+
+    b.build()
+}
+
+// ── parse_exact ───────────────────────────────────────────────────────────────
+
+pub(crate) fn parse_exact(s: &str, fmt: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    match fmt {
+        "c" | "t" | "T" => parse_constant(s),
+        "g" => parse_g(s, sep),
+        "G" => parse_g_upper(s, sep),
+        "" => Err(ParseError::InvalidStructure),
+        _ => parse_custom(s, fmt),
+    }
+}
+
+fn strip_neg(s: &str) -> (bool, &str) {
+    if let Some(r) = s.strip_prefix('-') {
+        (true, r)
+    } else {
+        (false, s)
+    }
+}
+
+/// "c"/"t"/"T": `[-][d.]hh:mm[:ss[.fffffff]]`
+fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(s.trim());
+    if s.is_empty() {
+        return Err(ParseError::Empty);
+    }
+
+    let mut it = s.splitn(3, ':');
+    let day_hour = it.next().ok_or(ParseError::InvalidStructure)?;
+    let (days_str, hours_s) = match day_hour.split_once('.') {
+        Some((d, h)) => (Some(d), h),
+        None => (None, day_hour),
+    };
+
+    let min = it.next().ok_or(ParseError::InvalidStructure)?;
+
+    // C# ParseTime (TimeSpanParse.cs line 1384): `if (_ch == ':')` makes the
+    // second colon and seconds optional — "hh:mm" is a valid "c" input.
+    let (sec_s, frac_s) = match it.next() {
+        None => ("", None),
+        Some(sf) => match sf.split_once('.') {
+            Some((s, f)) => (s, Some(f)),
+            None => {
+                if sf.is_empty() {
+                    return Err(ParseError::InvalidStructure);
+                }
+                (sf, None)
+            }
+        },
+    };
+
+    let mut b = Builder::new(neg);
+    b.days = days_str;
+    b.hours = Some(hours_s);
+    b.minutes = Some(min);
+    b.seconds = Some(sec_s);
+    b.frac = frac_s;
+    b.build()
+}
+
+/// "g": documented output format is `[-][d:]h:mm:ss[.FFFFFFF]`, but the C# runtime
+/// `ParseExact` also accepts reduced forms: bare `d` and `h:mm` without seconds.
+/// See: <https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs>
+fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(s.trim());
+    if s.is_empty() {
+        return Err(ParseError::Empty);
+    }
+
+    let mut it = s.split(':');
+    let p0 = it.next().ok_or(ParseError::InvalidStructure)?;
+    let p1 = it.next();
+    let p2 = it.next();
+    let p3 = it.next();
+    if it.next().is_some() {
+        return Err(ParseError::InvalidStructure);
+    }
+
+    let mut b = Builder::new(neg);
+
+    // bare d — no colons
+    if p1.is_none() {
+        b.days = Some(p0);
+        return b.build();
+    }
+
+    // h:mm — one colon, no seconds
+    if p2.is_none() {
+        if p0.contains(sep) {
+            return Err(ParseError::InvalidStructure);
+        }
+        b.hours = Some(p0);
+        b.minutes = p1;
+        return b.build();
+    }
+
+    // p1 and p2 are both Some by the early returns above.
+    // p3 signals days; seconds[.frac] is always in the rightmost component.
+    let last = p3.or(p2).unwrap();
+    let (sec_s, frac_s) = match last.split_once(sep) {
+        Some((s, f)) => (s, Some(f)),
+        None => (last, None),
+    };
+    if sec_s.is_empty() && frac_s.is_none() {
+        return Err(ParseError::InvalidStructure);
+    }
+    b.frac = frac_s;
+    b.seconds = Some(sec_s);
+    if p3.is_some() {
+        // d:h:mm:ss — p0=d, p1=h, p2=mm
+        b.days = Some(p0);
+        b.hours = p1;
+        b.minutes = p2;
+    } else {
+        // h:mm:ss — p0=h, p1=mm (p2 was last)
+        if p0.contains(sep) {
+            return Err(ParseError::InvalidStructure);
+        }
+        b.hours = Some(p0);
+        b.minutes = p1;
+    }
+
+    b.build()
+}
+
+/// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
+fn parse_g_upper(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(s.trim());
+    if s.is_empty() {
+        return Err(ParseError::Empty);
+    }
+
+    let mut it = s.split(':');
+    let days = it.next().ok_or(ParseError::InvalidStructure)?;
+    let h = it.next().ok_or(ParseError::InvalidStructure)?;
+    let min = it.next().ok_or(ParseError::InvalidStructure)?;
+    let sec_frac = it.next().ok_or(ParseError::InvalidStructure)?;
+    if it.next().is_some() {
+        return Err(ParseError::InvalidStructure);
+    }
+    let (sec_s, frac_s) = sec_frac
+        .split_once(sep)
+        .ok_or(ParseError::InvalidStructure)?;
+
+    let mut b = Builder::new(neg);
+    b.days = Some(days);
+    b.hours = Some(h);
+    b.minutes = Some(min);
+    b.seconds = Some(sec_s);
+    b.frac = Some(frac_s);
+    b.build()
+}
+
+/// Custom format specifier parsing.
+fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
+    // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
+    // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
+    if fmt.chars().count() < 2 {
+        return Err(ParseError::InvalidStructure);
+    }
+    let mut it = fmt.chars().peekable();
+    let mut inp = input;
+    let mut b = Builder::new(false);
+
+    while let Some(mut ch) = it.next() {
+        // C# TryParseByFormat: '%' consumes itself then re-enters the full switch
+        // (including ParseRepeatPattern) on the next character — it is a transparent
+        // pass-through. '%' at end-of-format or '%%' are both errors.
+        if ch == '%' {
+            ch = it.next().ok_or(ParseError::InvalidStructure)?;
+            if ch == '%' {
+                return Err(ParseError::InvalidStructure);
+            }
+        }
+        match ch {
+            'd' | 'h' | 'm' | 's' | 'f' | 'F' => {
+                let mut n = 1;
+                while it.peek() == Some(&ch) {
+                    it.next();
+                    n += 1;
+                }
+                let max = match ch {
+                    'd' => 8,
+                    'h' | 'm' | 's' => 2,
+                    _ => 7,
+                };
+                if n > max {
+                    return Err(ParseError::InvalidStructure);
+                }
+                apply_spec(ch, n, &mut inp, &mut b)?;
+            }
+            '\\' => {
+                let expected = it.next().ok_or(ParseError::InvalidStructure)?;
+                let got = inp.chars().next().ok_or(ParseError::InvalidStructure)?;
+                if got != expected {
+                    return Err(ParseError::InvalidStructure);
+                }
+                inp = &inp[got.len_utf8()..];
+            }
+            q @ ('\'' | '"') => {
+                let mut lit = String::new();
+                let mut closed = false;
+                // C# DateTimeParse.TryParseQuoteString (DateTimeParse.cs line 4600):
+                // '\' inside a quoted literal escapes the next character.
+                while let Some(c) = it.next() {
+                    if c == '\\' {
+                        let escaped = it.next().ok_or(ParseError::InvalidStructure)?;
+                        lit.push(escaped);
+                    } else if c == q {
+                        closed = true;
+                        break;
+                    } else {
+                        lit.push(c);
+                    }
+                }
+                if !closed {
+                    return Err(ParseError::InvalidStructure);
+                }
+                if !inp.starts_with(lit.as_str()) {
+                    return Err(ParseError::InvalidStructure);
+                }
+                inp = &inp[lit.len()..];
+            }
+            _ => return Err(ParseError::InvalidStructure),
+        }
+    }
+
+    if !inp.is_empty() {
+        return Err(ParseError::InvalidStructure);
+    }
+    b.build()
+}
+
+fn apply_spec<'a>(
+    ch: char,
+    n: usize,
+    inp: &mut &'a str,
+    b: &mut Builder<'a>,
+) -> Result<(), ParseError> {
+    macro_rules! dup {
+        ($field:expr) => {
+            if $field.is_some() {
+                return Err(ParseError::InvalidStructure);
+            }
+        };
+    }
+    match ch {
+        'd' => {
+            dup!(b.days);
+            b.days = Some(if n == 1 {
+                read_greedy_str(inp, 8)?
+            } else {
+                read_exact_str(inp, n)?
+            });
+        }
+        'h' => {
+            dup!(b.hours);
+            b.hours = Some(if n == 1 {
+                read_greedy_str(inp, 2)?
+            } else {
+                read_exact_str(inp, n)?
+            });
+        }
+        'm' => {
+            dup!(b.minutes);
+            b.minutes = Some(if n == 1 {
+                read_greedy_str(inp, 2)?
+            } else {
+                read_exact_str(inp, n)?
+            });
+        }
+        's' => {
+            dup!(b.seconds);
+            b.seconds = Some(if n == 1 {
+                read_greedy_str(inp, 2)?
+            } else {
+                read_exact_str(inp, n)?
+            });
+        }
+        'f' => {
+            dup!(b.frac);
+            b.frac = Some(read_exact_str(inp, n)?);
+        }
+        'F' => {
+            dup!(b.frac);
+            // C# TryParseByFormat (TimeSpanParse.cs line 1317): ParseExactDigits
+            // return value is ignored for 'F' — zero digits is valid (frac = 0).
+            let count = inp
+                .bytes()
+                .take(n)
+                .take_while(|b| b.is_ascii_digit())
+                .count();
+            if count > 0 {
+                b.frac = Some(&inp[..count]);
+            }
+            *inp = &inp[count..];
+        }
+        _ => return Err(ParseError::InvalidStructure),
+    }
+    Ok(())
+}
+
+fn read_greedy_str<'a>(inp: &mut &'a str, max: usize) -> Result<&'a str, ParseError> {
+    let n = inp
+        .bytes()
+        .take(max)
+        .take_while(|b| b.is_ascii_digit())
+        .count();
+    if n == 0 {
+        return Err(ParseError::InvalidStructure);
+    }
+    let s = &inp[..n];
+    *inp = &inp[n..];
+    Ok(s)
+}
+
+fn read_exact_str<'a>(inp: &mut &'a str, n: usize) -> Result<&'a str, ParseError> {
+    if inp.len() < n {
+        return Err(ParseError::InvalidStructure);
+    }
+    if !inp[..n].bytes().all(|b| b.is_ascii_digit()) {
+        return Err(ParseError::InvalidCharacter);
+    }
+    let s = &inp[..n];
+    *inp = &inp[n..];
+    Ok(s)
+}
