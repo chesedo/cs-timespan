@@ -460,3 +460,38 @@ fn format_g_upper_fr_fr_uses_comma_separator() {
         );
     }
 }
+
+#[test]
+fn format_custom_unclosed_quote() {
+    // C# TimeSpanFormat.cs ParseQuoteString: reaching end of format without closing quote
+    // throws FormatException. Lines ~210-230.
+    assert_eq!(
+        input().to_string_fmt("'abc"),
+        Err(FormatError::UnclosedQuote),
+    );
+    assert_eq!(
+        input().to_string_fmt(r#""abc"#),
+        Err(FormatError::UnclosedQuote),
+    );
+}
+
+#[test]
+fn format_custom_invalid_percent() {
+    // C# TimeSpanFormat.cs FormatCustomized: "%%" or lone "%" at end throws FormatException.
+    // Lines ~180-195.
+    assert_eq!(
+        input().to_string_fmt("%%"),
+        Err(FormatError::InvalidPercent),
+    );
+    assert_eq!(input().to_string_fmt("%"), Err(FormatError::InvalidPercent),);
+}
+
+#[test]
+fn format_custom_trailing_escape() {
+    // C# TimeSpanFormat.cs FormatCustomized: trailing '\' with no following char throws FormatException.
+    // Lines ~200-205.
+    assert_eq!(
+        input().to_string_fmt(r"\"),
+        Err(FormatError::TrailingEscape),
+    );
+}

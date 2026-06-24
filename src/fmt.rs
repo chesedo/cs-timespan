@@ -137,12 +137,17 @@ impl Components {
 
         while i < chars.len() {
             match chars[i] {
-                // `%x` — single specifier written with explicit percent prefix
+                // `%x` — single specifier written with explicit percent prefix.
+                // C# FormatCustomized (TimeSpanFormat.cs): "%%" or lone "%" → FormatException.
                 '%' if i + 1 < chars.len() => {
                     i += 1;
+                    if chars[i] == '%' {
+                        return Err(FormatError::InvalidPercent);
+                    }
                     out.push_str(&self.format_specifier(chars[i], 1));
                     i += 1;
                 }
+                '%' => return Err(FormatError::InvalidPercent),
                 // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars
                 // C# FormatCustomized (TimeSpanFormat.cs): repeat > max throws FormatException.
                 ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
@@ -158,17 +163,26 @@ impl Components {
                     out.push_str(&self.format_specifier(ch, n));
                     i += n;
                 }
-                // `\x` — escape: next char is a literal
+                // `\x` — escape: next char is a literal.
+                // C# FormatCustomized (TimeSpanFormat.cs): trailing '\' → FormatException.
                 '\\' if i + 1 < chars.len() => {
                     out.push(chars[i + 1]);
                     i += 2;
                 }
-                // `'...'` or `"..."` — quoted literal string
-                // C# ParseQuoteString (TimeSpanFormat.cs): '\' inside quotes escapes next char.
+                '\\' => return Err(FormatError::TrailingEscape),
+                // `'...'` or `"..."` — quoted literal string.
+                // C# ParseQuoteString (TimeSpanFormat.cs): '\' inside quotes escapes next char;
+                // reaching end without closing quote → FormatException.
                 '\'' | '"' => {
                     let q = chars[i];
                     i += 1;
-                    while i < chars.len() && chars[i] != q {
+                    loop {
+                        if i >= chars.len() {
+                            return Err(FormatError::UnclosedQuote);
+                        }
+                        if chars[i] == q {
+                            break;
+                        }
                         if chars[i] == '\\' && i + 1 < chars.len() {
                             i += 1;
                         }
