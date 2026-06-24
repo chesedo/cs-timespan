@@ -131,27 +131,25 @@ impl Components {
     }
 
     fn format_custom(&self, fmt: &str) -> Result<String, FormatError> {
-        let chars: Vec<char> = fmt.chars().collect();
+        let mut chars = fmt.chars().peekable();
         let mut out = String::new();
-        let mut i = 0;
 
-        while i < chars.len() {
-            match chars[i] {
+        while let Some(c) = chars.next() {
+            match c {
                 // `%x` — single specifier written with explicit percent prefix.
                 // C# FormatCustomized (TimeSpanFormat.cs): "%%" or lone "%" → FormatException.
-                '%' if i + 1 < chars.len() => {
-                    i += 1;
-                    if chars[i] == '%' {
-                        return Err(FormatError::InvalidPercent);
-                    }
-                    out.push_str(&self.format_specifier(chars[i], 1)?);
-                    i += 1;
-                }
-                '%' => return Err(FormatError::InvalidPercent),
-                // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars
+                '%' => match chars.next() {
+                    None | Some('%') => return Err(FormatError::InvalidPercent),
+                    Some(next) => out.push_str(&self.format_specifier(next, 1)?),
+                },
+                // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars.
                 // C# FormatCustomized (TimeSpanFormat.cs): repeat > max throws FormatException.
                 ch @ ('d' | 'h' | 'm' | 's' | 'f' | 'F') => {
-                    let n = run_length(&chars, i, ch);
+                    let mut n = 1;
+                    while chars.peek() == Some(&ch) {
+                        chars.next();
+                        n += 1;
+                    }
                     let max = match ch {
                         'd' => 8,
                         'h' | 'm' | 's' => 2,
@@ -161,36 +159,27 @@ impl Components {
                         return Err(FormatError::RepeatTooLong);
                     }
                     out.push_str(&self.format_specifier(ch, n)?);
-                    i += n;
                 }
                 // `\x` — escape: next char is a literal.
                 // C# FormatCustomized (TimeSpanFormat.cs): trailing '\' → FormatException.
-                '\\' if i + 1 < chars.len() => {
-                    out.push(chars[i + 1]);
-                    i += 2;
-                }
-                '\\' => return Err(FormatError::TrailingEscape),
+                '\\' => match chars.next() {
+                    None => return Err(FormatError::TrailingEscape),
+                    Some(next) => out.push(next),
+                },
                 // `'...'` or `"..."` — quoted literal string.
                 // C# ParseQuoteString (TimeSpanFormat.cs): '\' inside quotes escapes next char;
                 // reaching end without closing quote → FormatException.
-                '\'' | '"' => {
-                    let q = chars[i];
-                    i += 1;
-                    loop {
-                        if i >= chars.len() {
-                            return Err(FormatError::UnclosedQuote);
-                        }
-                        if chars[i] == q {
-                            break;
-                        }
-                        if chars[i] == '\\' && i + 1 < chars.len() {
-                            i += 1;
-                        }
-                        out.push(chars[i]);
-                        i += 1;
+                q @ ('\'' | '"') => loop {
+                    match chars.next() {
+                        None => return Err(FormatError::UnclosedQuote),
+                        Some(c) if c == q => break,
+                        Some('\\') => match chars.next() {
+                            None => return Err(FormatError::UnclosedQuote),
+                            Some(escaped) => out.push(escaped),
+                        },
+                        Some(c) => out.push(c),
                     }
-                    i += 1; // skip closing quote
-                }
+                },
                 _ => return Err(FormatError::UnknownSpecifier),
             }
         }
@@ -255,8 +244,4 @@ fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
     } else {
         s.to_string()
     }
-}
-
-fn run_length(chars: &[char], start: usize, ch: char) -> usize {
-    chars[start..].iter().take_while(|&&c| c == ch).count()
 }
