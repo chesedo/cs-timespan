@@ -527,7 +527,7 @@ fn format_custom_trailing_escape() {
     // Lines ~200-205.
     assert_eq!(
         input().to_string_fmt(r"\").unwrap_err().to_string(),
-        r#"'\' at end of format string
+        r#"trailing '\' must be followed by a character to escape
   "\"
    ^"#
     );

@@ -64,7 +64,9 @@ impl std::fmt::Display for FormatError {
                 f,
                 "'%' must be followed by a single specifier (d h m s f F)"
             )?,
-            FormatErrorKind::TrailingEscape => writeln!(f, "'\\' at end of format string")?,
+            FormatErrorKind::TrailingEscape => {
+                writeln!(f, "trailing '\\' must be followed by a character to escape")?
+            }
         }
         writeln!(f, "  \"{}\"", self.fmt)?;
         write!(f, "   {}^", " ".repeat(self.pos))
