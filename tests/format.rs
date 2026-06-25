@@ -14,7 +14,7 @@
 // - C# `null` format and `"c"` / `"t"` / `"T"` all produce identical output;
 //   the null case maps to `Display` (`ts.to_string()`).
 
-use cs_timespan::{FormatError, Locale, TimeSpan};
+use cs_timespan::{FormatErrorKind, Locale, TimeSpan};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,8 +66,8 @@ fn format_custom_dddddd_padded() {
 fn format_custom_invalid_d_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 8 for 'd' throws FormatException.
     assert_eq!(
-        input().to_string_fmt("ddddddddd"), // 9 d's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("ddddddddd").unwrap_err().kind, // 9 d's
+        FormatErrorKind::RepeatTooLong,
     );
 }
 
@@ -75,16 +75,16 @@ fn format_custom_invalid_d_repeat_too_long() {
 fn format_custom_invalid_hms_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 2 for 'h', 'm', 's' throws FormatException.
     assert_eq!(
-        input().to_string_fmt("hhh"), // 3 h's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("hhh").unwrap_err().kind, // 3 h's
+        FormatErrorKind::RepeatTooLong,
     );
     assert_eq!(
-        input().to_string_fmt("mmm"), // 3 m's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("mmm").unwrap_err().kind, // 3 m's
+        FormatErrorKind::RepeatTooLong,
     );
     assert_eq!(
-        input().to_string_fmt("sss"), // 3 s's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("sss").unwrap_err().kind, // 3 s's
+        FormatErrorKind::RepeatTooLong,
     );
 }
 
@@ -92,12 +92,12 @@ fn format_custom_invalid_hms_repeat_too_long() {
 fn format_custom_invalid_frac_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 7 for 'f'/'F' throws FormatException.
     assert_eq!(
-        input().to_string_fmt("ffffffff"), // 8 f's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("ffffffff").unwrap_err().kind, // 8 f's
+        FormatErrorKind::RepeatTooLong,
     );
     assert_eq!(
-        input().to_string_fmt("FFFFFFFF"), // 8 F's
-        Err(FormatError::RepeatTooLong),
+        input().to_string_fmt("FFFFFFFF").unwrap_err().kind, // 8 F's
+        FormatErrorKind::RepeatTooLong,
     );
 }
 
@@ -106,8 +106,8 @@ fn format_custom_percent_unknown_specifier() {
     // C# TimeSpanFormat.cs FormatCustomized line ~419: %x recurses into FormatCustomized
     // with just 'x'; 'x' hits the default case (line ~451) which throws FormatException.
     assert_eq!(
-        input().to_string_fmt("%x"),
-        Err(FormatError::UnknownSpecifier),
+        input().to_string_fmt("%x").unwrap_err().kind,
+        FormatErrorKind::UnknownSpecifier,
     );
 }
 
@@ -476,12 +476,12 @@ fn format_custom_unclosed_quote() {
     // C# TimeSpanFormat.cs ParseQuoteString: reaching end of format without closing quote
     // throws FormatException. Lines ~210-230.
     assert_eq!(
-        input().to_string_fmt("'abc"),
-        Err(FormatError::UnclosedQuote),
+        input().to_string_fmt("'abc").unwrap_err().kind,
+        FormatErrorKind::UnclosedQuote,
     );
     assert_eq!(
-        input().to_string_fmt(r#""abc"#),
-        Err(FormatError::UnclosedQuote),
+        input().to_string_fmt(r#""abc"#).unwrap_err().kind,
+        FormatErrorKind::UnclosedQuote,
     );
 }
 
@@ -490,10 +490,13 @@ fn format_custom_invalid_percent() {
     // C# TimeSpanFormat.cs FormatCustomized: "%%" or lone "%" at end throws FormatException.
     // Lines ~180-195.
     assert_eq!(
-        input().to_string_fmt("%%"),
-        Err(FormatError::InvalidPercent),
+        input().to_string_fmt("%%").unwrap_err().kind,
+        FormatErrorKind::InvalidPercent,
     );
-    assert_eq!(input().to_string_fmt("%"), Err(FormatError::InvalidPercent),);
+    assert_eq!(
+        input().to_string_fmt("%").unwrap_err().kind,
+        FormatErrorKind::InvalidPercent
+    );
 }
 
 #[test]
@@ -501,7 +504,7 @@ fn format_custom_trailing_escape() {
     // C# TimeSpanFormat.cs FormatCustomized: trailing '\' with no following char throws FormatException.
     // Lines ~200-205.
     assert_eq!(
-        input().to_string_fmt(r"\"),
-        Err(FormatError::TrailingEscape),
+        input().to_string_fmt(r"\").unwrap_err().kind,
+        FormatErrorKind::TrailingEscape,
     );
 }

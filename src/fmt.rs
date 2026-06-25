@@ -2,11 +2,11 @@ use std::fmt::Write as FmtWrite;
 
 use crate::TimeSpan;
 
-/// Error returned when a custom format string is invalid.
+/// The category of error returned when a custom format string is invalid.
 ///
 /// Mirrors the `FormatException` C# throws from `TimeSpan.ToString(string)`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FormatError {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormatErrorKind {
     /// A specifier is repeated more times than allowed
     /// (`d` > 8, `h`/`m`/`s` > 2, `f`/`F` > 7).
     RepeatTooLong,
@@ -20,17 +20,45 @@ pub enum FormatError {
     TrailingEscape,
 }
 
+/// Error returned when a custom format string is invalid.
+///
+/// Carries the [`kind`](FormatError::kind) of error, the char [`pos`](FormatError::pos)
+/// where it was detected, and the original format string for display purposes.
+#[derive(Debug, Clone)]
+pub struct FormatError {
+    pub kind: FormatErrorKind,
+    /// Char index (0-based) of the offending character in the format string.
+    pos: usize,
+    fmt: Box<str>,
+}
+
+impl FormatError {
+    fn new(kind: FormatErrorKind, pos: usize, fmt: &str) -> Self {
+        Self {
+            kind,
+            pos,
+            fmt: fmt.into(),
+        }
+    }
+
+    /// Char index (0-based) of the offending character in the format string.
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
 impl std::fmt::Display for FormatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RepeatTooLong => f.write_str("format specifier repeated too many times"),
-            Self::UnknownSpecifier => f.write_str("unrecognised character in format string"),
-            Self::UnclosedQuote => f.write_str("quoted literal is not closed"),
-            Self::InvalidPercent => {
-                f.write_str("'%' must be followed by a single specifier, not '%'")
-            }
-            Self::TrailingEscape => f.write_str("'\\' at end of format string"),
-        }
+        let msg = match self.kind {
+            FormatErrorKind::RepeatTooLong => "specifier repeated too many times",
+            FormatErrorKind::UnknownSpecifier => "unrecognised specifier",
+            FormatErrorKind::UnclosedQuote => "quoted literal is not closed",
+            FormatErrorKind::InvalidPercent => "'%' must be followed by a single specifier",
+            FormatErrorKind::TrailingEscape => "'\\' at end of format string",
+        };
+        writeln!(f, "{msg}")?;
+        writeln!(f, "  \"{}\"", self.fmt)?;
+        write!(f, "   {}^", " ".repeat(self.pos))
     }
 }
 
@@ -133,14 +161,26 @@ impl Components {
     fn format_custom(&self, fmt: &str) -> Result<String, FormatError> {
         let mut chars = fmt.chars().peekable();
         let mut out = String::with_capacity(fmt.len());
+        let mut pos = 0usize;
+
+        let err = |kind, p| FormatError::new(kind, p, fmt);
 
         while let Some(c) = chars.next() {
+            let cur = pos;
+            pos += 1;
             match c {
                 // `%x` — single specifier written with explicit percent prefix.
                 // C# FormatCustomized (TimeSpanFormat.cs): "%%" or lone "%" → FormatException.
                 '%' => match chars.next() {
-                    None | Some('%') => return Err(FormatError::InvalidPercent),
-                    Some(next) => out.push_str(&self.format_specifier(next, 1)?),
+                    None | Some('%') => return Err(err(FormatErrorKind::InvalidPercent, cur)),
+                    Some(next) => {
+                        let spec_pos = pos;
+                        pos += 1;
+                        match self.format_specifier(next, 1) {
+                            Some(s) => out.push_str(&s),
+                            None => return Err(err(FormatErrorKind::UnknownSpecifier, spec_pos)),
+                        }
+                    }
                 },
                 // `d`, `h`, `m`, `s`, `f`, `F` — run of identical specifier chars.
                 // C# FormatCustomized (TimeSpanFormat.cs): repeat > max throws FormatException.
@@ -148,6 +188,7 @@ impl Components {
                     let mut n = 1;
                     while chars.peek() == Some(&ch) {
                         chars.next();
+                        pos += 1;
                         n += 1;
                     }
                     let max = match ch {
@@ -156,31 +197,35 @@ impl Components {
                         _ => 7,
                     };
                     if n > max {
-                        return Err(FormatError::RepeatTooLong);
+                        return Err(err(FormatErrorKind::RepeatTooLong, cur));
                     }
-                    out.push_str(&self.format_specifier(ch, n)?);
+                    // ch is a validated specifier — format_specifier always returns Some
+                    out.push_str(&self.format_specifier(ch, n).unwrap());
                 }
                 // `\x` — escape: next char is a literal.
                 // C# FormatCustomized (TimeSpanFormat.cs): trailing '\' → FormatException.
                 '\\' => match chars.next() {
-                    None => return Err(FormatError::TrailingEscape),
-                    Some(next) => out.push(next),
+                    None => return Err(err(FormatErrorKind::TrailingEscape, cur)),
+                    Some(next) => {
+                        pos += 1;
+                        out.push(next);
+                    }
                 },
                 // `'...'` or `"..."` — quoted literal string.
                 // C# ParseQuoteString (TimeSpanFormat.cs): '\' inside quotes escapes next char;
                 // reaching end without closing quote → FormatException.
                 q @ ('\'' | '"') => loop {
                     match chars.next() {
-                        None => return Err(FormatError::UnclosedQuote),
+                        None => return Err(err(FormatErrorKind::UnclosedQuote, cur)),
                         Some(c) if c == q => break,
                         Some('\\') => match chars.next() {
-                            None => return Err(FormatError::UnclosedQuote),
+                            None => return Err(err(FormatErrorKind::UnclosedQuote, cur)),
                             Some(escaped) => out.push(escaped),
                         },
                         Some(c) => out.push(c),
                     }
                 },
-                _ => return Err(FormatError::UnknownSpecifier),
+                _ => return Err(err(FormatErrorKind::UnknownSpecifier, cur)),
             }
         }
 
@@ -188,8 +233,9 @@ impl Components {
     }
 
     /// Emit one component according to its specifier character and repeat count `n`.
-    fn format_specifier(&self, ch: char, n: usize) -> Result<String, FormatError> {
-        Ok(match ch {
+    /// Returns `None` for unrecognised specifier chars.
+    fn format_specifier(&self, ch: char, n: usize) -> Option<String> {
+        Some(match ch {
             'd' => {
                 let s = self.days.to_string();
                 if s.len() < n {
@@ -205,7 +251,7 @@ impl Components {
             's' => fmt_component(n, self.seconds),
             'f' => fmt_frac(self.sub_sec_ticks, n, false),
             'F' => fmt_frac(self.sub_sec_ticks, n, true),
-            _ => return Err(FormatError::UnknownSpecifier),
+            _ => return None,
         })
     }
 }

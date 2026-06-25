@@ -2,7 +2,7 @@ pub use num_format::Locale;
 
 mod fmt;
 mod parse;
-pub use fmt::FormatError;
+pub use fmt::{FormatError, FormatErrorKind};
 pub use parse::{ParseError, TimeSpanStyles};
 
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
@@ -173,13 +173,13 @@ impl TimeSpan {
     /// for fractional seconds, `%x` for a single specifier, `\x` for a literal.
     ///
     /// ```
-    /// use cs_timespan::{TimeSpan, FormatError};
+    /// use cs_timespan::{TimeSpan, FormatErrorKind};
     /// let ts = TimeSpan::from_ticks(1_234_567_890_123);
     ///
     /// assert_eq!(ts.to_string_fmt("c").unwrap(),          "1.10:17:36.7890123");
     /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm").unwrap(), "1.10:17");
     /// assert_eq!(ts.to_string_fmt("hh").unwrap(),         "10");
-    /// assert_eq!(ts.to_string_fmt("x"), Err(FormatError::UnknownSpecifier));
+    /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind, FormatErrorKind::UnknownSpecifier);
     /// ```
     pub fn to_string_fmt(&self, fmt: &str) -> Result<String, FormatError> {
         self.to_string_fmt_with_culture(fmt, Locale::en)
