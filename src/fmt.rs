@@ -9,7 +9,8 @@ use crate::TimeSpan;
 pub enum FormatErrorKind {
     /// A specifier is repeated more times than allowed
     /// (`d` > 8, `h`/`m`/`s` > 2, `f`/`F` > 7).
-    RepeatTooLong,
+    /// Contains the maximum allowed repeat count.
+    RepeatTooLong(usize),
     /// An unrecognised character appeared in the custom format string.
     UnknownSpecifier,
     /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
@@ -49,14 +50,17 @@ impl FormatError {
 
 impl std::fmt::Display for FormatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let msg = match self.kind {
-            FormatErrorKind::RepeatTooLong => "specifier repeated too many times",
-            FormatErrorKind::UnknownSpecifier => "unrecognised specifier",
-            FormatErrorKind::UnclosedQuote => "quoted literal is not closed",
-            FormatErrorKind::InvalidPercent => "'%' must be followed by a single specifier",
-            FormatErrorKind::TrailingEscape => "'\\' at end of format string",
-        };
-        writeln!(f, "{msg}")?;
+        match self.kind {
+            FormatErrorKind::RepeatTooLong(max) => {
+                writeln!(f, "specifier repeated too many times (max {max})")?
+            }
+            FormatErrorKind::UnknownSpecifier => writeln!(f, "unrecognised specifier")?,
+            FormatErrorKind::UnclosedQuote => writeln!(f, "quoted literal is not closed")?,
+            FormatErrorKind::InvalidPercent => {
+                writeln!(f, "'%' must be followed by a single specifier")?
+            }
+            FormatErrorKind::TrailingEscape => writeln!(f, "'\\' at end of format string")?,
+        }
         writeln!(f, "  \"{}\"", self.fmt)?;
         write!(f, "   {}^", " ".repeat(self.pos))
     }
@@ -197,7 +201,7 @@ impl Components {
                         _ => 7,
                     };
                     if n > max {
-                        return Err(err(FormatErrorKind::RepeatTooLong, cur));
+                        return Err(err(FormatErrorKind::RepeatTooLong(max), cur + max));
                     }
                     // ch is a validated specifier — format_specifier always returns Some
                     out.push_str(&self.format_specifier(ch, n).unwrap());

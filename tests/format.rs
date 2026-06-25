@@ -67,9 +67,9 @@ fn format_custom_invalid_d_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 8 for 'd' throws FormatException.
     assert_eq!(
         input().to_string_fmt("ddddddddd").unwrap_err().to_string(), // 9 d's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 8)
   "ddddddddd"
-   ^"#
+           ^"#
     );
 }
 
@@ -78,21 +78,21 @@ fn format_custom_invalid_hms_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 2 for 'h', 'm', 's' throws FormatException.
     assert_eq!(
         input().to_string_fmt("hhh").unwrap_err().to_string(), // 3 h's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 2)
   "hhh"
-   ^"#
+     ^"#
     );
     assert_eq!(
         input().to_string_fmt("mmm").unwrap_err().to_string(), // 3 m's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 2)
   "mmm"
-   ^"#
+     ^"#
     );
     assert_eq!(
         input().to_string_fmt("sss").unwrap_err().to_string(), // 3 s's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 2)
   "sss"
-   ^"#
+     ^"#
     );
 }
 
@@ -101,15 +101,15 @@ fn format_custom_invalid_frac_repeat_too_long() {
     // C# TimeSpanFormat.cs FormatCustomized: repeat count > 7 for 'f'/'F' throws FormatException.
     assert_eq!(
         input().to_string_fmt("ffffffff").unwrap_err().to_string(), // 8 f's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 7)
   "ffffffff"
-   ^"#
+          ^"#
     );
     assert_eq!(
         input().to_string_fmt("FFFFFFFF").unwrap_err().to_string(), // 8 F's
-        r#"specifier repeated too many times
+        r#"specifier repeated too many times (max 7)
   "FFFFFFFF"
-   ^"#
+          ^"#
     );
 }
 
