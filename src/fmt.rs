@@ -291,3 +291,43 @@ fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
         s.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_error_display_caret_at_pos_zero() {
+        let e = FormatError::new(FormatErrorKind::UnknownSpecifier, 0, "x");
+        assert_eq!(
+            e.to_string(),
+            r#"unrecognised specifier
+  "x"
+   ^"#
+        );
+    }
+
+    #[test]
+    fn format_error_display_caret_mid_string() {
+        // '%' at pos 2 in "dd%%"
+        let e = FormatError::new(FormatErrorKind::InvalidPercent, 2, "dd%%");
+        assert_eq!(
+            e.to_string(),
+            r#"'%' must be followed by a single specifier
+  "dd%%"
+     ^"#
+        );
+    }
+
+    #[test]
+    fn format_error_display_caret_opening_quote() {
+        // unclosed quote: opening '\'' at pos 5 in "hh:mm'abc"
+        let e = FormatError::new(FormatErrorKind::UnclosedQuote, 5, "hh:mm'abc");
+        assert_eq!(
+            e.to_string(),
+            r#"quoted literal is not closed
+  "hh:mm'abc"
+        ^"#
+        );
+    }
+}
