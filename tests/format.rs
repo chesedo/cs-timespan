@@ -497,7 +497,9 @@ fn format_custom_unclosed_quote() {
     );
     assert_eq!(
         input().to_string_fmt(r#""abc"#).unwrap_err().to_string(),
-        "quoted literal is not closed\n  \"\"abc\"\n   ^"
+        r#"quoted literal is not closed
+  ""abc"
+   ^"#
     );
 }
 
