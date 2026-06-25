@@ -509,13 +509,13 @@ fn format_custom_invalid_percent() {
     // Lines ~180-195.
     assert_eq!(
         input().to_string_fmt("%%").unwrap_err().to_string(),
-        r#"'%' must be followed by a single specifier
+        r#"'%' must be followed by a single specifier (d h m s f F)
   "%%"
    ^"#
     );
     assert_eq!(
         input().to_string_fmt("%").unwrap_err().to_string(),
-        r#"'%' must be followed by a single specifier
+        r#"'%' must be followed by a single specifier (d h m s f F)
   "%"
    ^"#
     );

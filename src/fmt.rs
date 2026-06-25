@@ -60,9 +60,10 @@ impl std::fmt::Display for FormatError {
                 "unrecognised specifier '{ch}'; valid specifiers: d h m s f F"
             )?,
             FormatErrorKind::UnclosedQuote => writeln!(f, "quoted literal is not closed")?,
-            FormatErrorKind::InvalidPercent => {
-                writeln!(f, "'%' must be followed by a single specifier")?
-            }
+            FormatErrorKind::InvalidPercent => writeln!(
+                f,
+                "'%' must be followed by a single specifier (d h m s f F)"
+            )?,
             FormatErrorKind::TrailingEscape => writeln!(f, "'\\' at end of format string")?,
         }
         writeln!(f, "  \"{}\"", self.fmt)?;
