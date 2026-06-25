@@ -69,7 +69,7 @@ impl Components {
 
     /// `"c"` / `"t"` / `"T"`: `[-][d.]hh:mm:ss[.fffffff]` — culture-invariant.
     fn format_constant(&self) -> String {
-        let mut out = String::new();
+        let mut out = String::with_capacity(24);
         if self.negative {
             out.push('-');
         }
@@ -90,7 +90,7 @@ impl Components {
 
     /// `"g"`: `[-][d:]h:mm:ss[.FFFFFFF]` — culture-sensitive decimal separator.
     fn format_general_short(&self, sep: char) -> String {
-        let mut out = String::new();
+        let mut out = String::with_capacity(24);
         if self.negative {
             out.push('-');
         }
@@ -112,7 +112,7 @@ impl Components {
 
     /// `"G"`: `[-]d:hh:mm:ss.fffffff` — culture-sensitive decimal separator.
     fn format_general_long(&self, sep: char) -> String {
-        let mut out = String::new();
+        let mut out = String::with_capacity(24);
         if self.negative {
             out.push('-');
         }
@@ -132,7 +132,7 @@ impl Components {
 
     fn format_custom(&self, fmt: &str) -> Result<String, FormatError> {
         let mut chars = fmt.chars().peekable();
-        let mut out = String::new();
+        let mut out = String::with_capacity(fmt.len());
 
         while let Some(c) = chars.next() {
             match c {
