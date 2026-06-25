@@ -179,7 +179,7 @@ impl TimeSpan {
     /// assert_eq!(ts.to_string_fmt("c").unwrap(),          "1.10:17:36.7890123");
     /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm").unwrap(), "1.10:17");
     /// assert_eq!(ts.to_string_fmt("hh").unwrap(),         "10");
-    /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind, FormatErrorKind::UnknownSpecifier);
+    /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind, FormatErrorKind::UnknownSpecifier('x'));
     /// ```
     pub fn to_string_fmt(&self, fmt: &str) -> Result<String, FormatError> {
         self.to_string_fmt_with_culture(fmt, Locale::en)

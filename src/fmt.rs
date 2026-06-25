@@ -12,7 +12,8 @@ pub enum FormatErrorKind {
     /// Contains the maximum allowed repeat count.
     RepeatTooLong(usize),
     /// An unrecognised character appeared in the custom format string.
-    UnknownSpecifier,
+    /// Contains the offending character.
+    UnknownSpecifier(char),
     /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
     UnclosedQuote,
     /// `%%` or a lone `%` at end of format string.
@@ -54,7 +55,10 @@ impl std::fmt::Display for FormatError {
             FormatErrorKind::RepeatTooLong(max) => {
                 writeln!(f, "specifier repeated too many times (max {max})")?
             }
-            FormatErrorKind::UnknownSpecifier => writeln!(f, "unrecognised specifier")?,
+            FormatErrorKind::UnknownSpecifier(ch) => writeln!(
+                f,
+                "unrecognised specifier '{ch}'; valid specifiers: d h m s f F"
+            )?,
             FormatErrorKind::UnclosedQuote => writeln!(f, "quoted literal is not closed")?,
             FormatErrorKind::InvalidPercent => {
                 writeln!(f, "'%' must be followed by a single specifier")?
@@ -182,7 +186,9 @@ impl Components {
                         pos += 1;
                         match self.format_specifier(next, 1) {
                             Some(s) => out.push_str(&s),
-                            None => return Err(err(FormatErrorKind::UnknownSpecifier, spec_pos)),
+                            None => {
+                                return Err(err(FormatErrorKind::UnknownSpecifier(next), spec_pos));
+                            }
                         }
                     }
                 },
@@ -229,7 +235,7 @@ impl Components {
                         Some(c) => out.push(c),
                     }
                 },
-                _ => return Err(err(FormatErrorKind::UnknownSpecifier, cur)),
+                _ => return Err(err(FormatErrorKind::UnknownSpecifier(c), cur)),
             }
         }
 
