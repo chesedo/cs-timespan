@@ -10,7 +10,7 @@
 // - C# `new TimeSpan(d, h, m, s, ms)` → `ts5(d, h, m, s, ms)`
 // - C# `-new TimeSpan(...)` (negation) → `neg(ts*(...))`
 
-use cs_timespan::{Locale, ParseError, ParseErrorKind, TimeSpan, TimeSpanStyles};
+use cs_timespan::{Locale, TimeSpan, TimeSpanStyles};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -321,16 +321,20 @@ fn parse_exact_custom_percent_passthrough() {
 #[test]
 fn parse_exact_invalid_empty_string() {
     assert_eq!(
-        TimeSpan::parse_exact("", "c").unwrap_err().kind,
-        ParseErrorKind::Empty,
+        TimeSpan::parse_exact("", "c").unwrap_err().to_string(),
+        r#"input is empty
+  ""
+   ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_lone_minus() {
     assert_eq!(
-        TimeSpan::parse_exact("-", "c").unwrap_err().kind,
-        ParseErrorKind::Empty,
+        TimeSpan::parse_exact("-", "c").unwrap_err().to_string(),
+        r#"input is empty
+  "-"
+   ^"#,
     );
 }
 
@@ -338,8 +342,12 @@ fn parse_exact_invalid_lone_minus() {
 fn parse_exact_invalid_garbage() {
     // "garbage" has 0 colons; "c" format requires exactly 2
     assert_eq!(
-        TimeSpan::parse_exact("garbage", "c").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("garbage", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "garbage"
+   ^"#,
     );
 }
 
@@ -348,19 +356,31 @@ fn parse_exact_invalid_wrong_separator() {
     // '?' replaces the first colon → day_hour = "1?59", no dot, hours = "1?59"
     // → non-digit in hours field → InvalidCharacter
     assert_eq!(
-        TimeSpan::parse_exact("1?59:02", "c").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter,
+        TimeSpan::parse_exact("1?59:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"input contains an invalid character
+  "1?59:02"
+    ^"#,
     );
     // '?' replaces the second colon → minutes = "59?02", non-digit → InvalidCharacter
     // (seconds are optional since C# ParseTime line 1384; the '?' lands in minutes)
     assert_eq!(
-        TimeSpan::parse_exact("1:59?02", "c").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter,
+        TimeSpan::parse_exact("1:59?02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"input contains an invalid character
+  "1:59?02"
+       ^"#,
     );
     // '?' replaces the decimal separator → appears as non-digit inside a component
     assert_eq!(
-        TimeSpan::parse_exact("1:59:02?123", "c").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter,
+        TimeSpan::parse_exact("1:59:02?123", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"input contains an invalid character
+  "1:59:02?123"
+          ^"#,
     );
 }
 
@@ -368,16 +388,24 @@ fn parse_exact_invalid_wrong_separator() {
 fn parse_exact_c_rejects_d_colon_form() {
     // "c" format uses dot separator for days; colon-separated days is only valid in "g"
     assert_eq!(
-        TimeSpan::parse_exact("1:12:24:02", "c").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter,
+        TimeSpan::parse_exact("1:12:24:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"input contains an invalid character
+  "1:12:24:02"
+          ^"#,
     );
 }
 
 #[test]
 fn parse_exact_g_rejects_dot_separated_days() {
     assert_eq!(
-        TimeSpan::parse_exact("1.12:24:02", "g").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("1.12:24:02", "g")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "1.12:24:02"
+   ^"#,
     );
 }
 
@@ -385,16 +413,24 @@ fn parse_exact_g_rejects_dot_separated_days() {
 fn parse_exact_g_upper_rejects_colon_without_fractional() {
     // "G" requires the full d:hh:mm:ss.fffffff pattern
     assert_eq!(
-        TimeSpan::parse_exact("1:12:24:02", "G").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("1:12:24:02", "G")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "1:12:24:02"
+           ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_empty_format_string() {
     assert_eq!(
-        TimeSpan::parse_exact("00:00:00", "").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("00:00:00", "")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "00:00:00"
+   ^"#,
     );
 }
 
@@ -404,32 +440,44 @@ fn parse_exact_invalid_empty_format_string() {
 #[test]
 fn parse_exact_invalid_single_char_custom_format() {
     assert_eq!(
-        TimeSpan::parse_exact("5", "d").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("5", "d").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "5"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse_exact("5", "h").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("5", "h").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "5"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_unknown_format_specifier() {
     assert_eq!(
-        TimeSpan::parse_exact("12.5:2", "V").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("12.5:2", "V")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12.5:2"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
-        TimeSpan::parse_exact("1", r"d%").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("1", r"d%").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "1"
+    ^"#,
     );
     assert_eq!(
-        TimeSpan::parse_exact("1", r"%%d").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("1", r"%%d").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "1"
+   ^"#,
     );
 }
 
@@ -438,26 +486,34 @@ fn parse_exact_invalid_repeated_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hhh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+   ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:hh\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+      ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+         ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+         ^"#,
     );
 }
 
@@ -467,20 +523,26 @@ fn parse_exact_invalid_wrong_digit_count() {
     assert_eq!(
         TimeSpan::parse_exact("123:34:56", r"hh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "123:34:56"
+     ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:345:56", r"hh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:345:56"
+        ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:056", r"hh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:056"
+           ^"#,
     );
 }
 
@@ -489,14 +551,18 @@ fn parse_exact_invalid_triple_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mmm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+      ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:sss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+         ^"#,
     );
 }
 
@@ -504,8 +570,12 @@ fn parse_exact_invalid_triple_specifier() {
 fn parse_exact_invalid_f_wrong_digit_count() {
     // "ffff" expects exactly 4 fractional digits; "678" is only 3 → input too short
     assert_eq!(
-        TimeSpan::parse_exact("678", "ffff").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("678", "ffff")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "678"
+   ^"#,
     );
 }
 
@@ -514,8 +584,10 @@ fn parse_exact_invalid_f_uppercase_too_many_chars() {
     assert_eq!(
         TimeSpan::parse_exact("00000012", "FFFFFFFF")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "00000012"
+   ^"#,
     );
 }
 
@@ -525,8 +597,10 @@ fn parse_exact_invalid_d_too_many_specifiers() {
     assert_eq!(
         TimeSpan::parse_exact("000000123", "ddddddddd")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "000000123"
+   ^"#,
     );
 }
 
@@ -535,32 +609,46 @@ fn parse_exact_invalid_duplicate_d_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"dd:dd:hh")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34:56"
+     ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_too_many_digits_for_dd() {
     assert_eq!(
-        TimeSpan::parse_exact("123:45", r"dd:hh").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("123:45", r"dd:hh")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "123:45"
+     ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_unknown_specifier_vv() {
     assert_eq!(
-        TimeSpan::parse_exact("12:34", r"dd:vv").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("12:34", r"dd:vv")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34"
+     ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_ff_repeated() {
     assert_eq!(
-        TimeSpan::parse_exact("12:45", "ff:ff").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse_exact("12:45", "ff:ff")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:45"
+     ^"#,
     );
 }
 
@@ -569,8 +657,10 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 minutes", r#"mm\:ss\ "minutes"#)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34 minutes"
+         ^"#,
     );
 }
 
@@ -579,8 +669,10 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 minutes", r"mm\:ss\ 'minutes")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34 minutes"
+         ^"#,
     );
 }
 
@@ -589,14 +681,18 @@ fn parse_exact_invalid_literal_mismatch() {
     assert_eq!(
         TimeSpan::parse_exact("12:34 mints", r#"mm\:ss\ "minutes""#)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34 mints"
+         ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34 mints", r"mm\:ss\ 'minutes'")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidStructure,
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "12:34 mints"
+         ^"#,
     );
 }
 
@@ -657,32 +753,52 @@ fn parse_exact_with_styles_assume_negative_zero_stays_zero() {
 #[test]
 fn parse_exact_overflow_hours_out_of_range() {
     assert_eq!(
-        TimeSpan::parse_exact("24:24:02", "c").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("24:24:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "24:24:02"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_exact_overflow_minutes_out_of_range() {
     assert_eq!(
-        TimeSpan::parse_exact("1:60:02", "c").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("1:60:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1:60:02"
+     ^"#,
     );
     assert_eq!(
-        TimeSpan::parse_exact("1.2:60:02", "c").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("1.2:60:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1.2:60:02"
+       ^"#,
     );
     assert_eq!(
-        TimeSpan::parse_exact("12:61:02", "g").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("12:61:02", "g")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "12:61:02"
+      ^"#,
     );
 }
 
 #[test]
 fn parse_exact_overflow_seconds_out_of_range() {
     assert_eq!(
-        TimeSpan::parse_exact("1:59:60", "c").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("1:59:60", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1:59:60"
+        ^"#,
     );
 }
 
@@ -690,8 +806,12 @@ fn parse_exact_overflow_seconds_out_of_range() {
 fn parse_exact_overflow_hours_exceed_23_in_c_format() {
     // "c" format hours must be 0–23; 24 hours overflows
     assert_eq!(
-        TimeSpan::parse_exact("1.24:59:02", "c").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse_exact("1.24:59:02", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1.24:59:02"
+     ^"#,
     );
 }
 
@@ -700,8 +820,10 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
     assert_eq!(
         TimeSpan::parse_exact("1:07:45:16.99999999", "G")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::Overflow,
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1:07:45:16.99999999"
+              ^"#,
     );
 }
 
@@ -711,8 +833,10 @@ fn parse_exact_overflow_custom_format() {
     assert_eq!(
         TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::Overflow,
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "12.35:32:43"
+      ^"#,
     );
 }
 
@@ -722,13 +846,17 @@ fn parse_exact_invalid_custom_wrong_digit_count_for_padded() {
     assert_eq!(
         TimeSpan::parse_exact("12.5:2:3", r"d\.hh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidCharacter,
+            .to_string(),
+        r#"input contains an invalid character
+  "12.5:2:3"
+       ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12.5:2", r"d\.hh\:mm\:ss")
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidCharacter,
+            .to_string(),
+        r#"input contains an invalid character
+  "12.5:2"
+       ^"#,
     );
 }

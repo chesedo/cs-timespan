@@ -85,7 +85,7 @@ impl TimeSpan {
     /// `h:mm:ss`, `d.hh:mm:ss`, `d:h:mm:ss`, with optional fractional seconds.
     ///
     /// ```
-    /// use cs_timespan::{ParseErrorKind, TimeSpan};
+    /// use cs_timespan::TimeSpan;
     ///
     /// assert_eq!(TimeSpan::parse("1:02:03").unwrap().ticks(), 37_230_000_000);
     /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().ticks(), 937_840_000_000);
@@ -93,9 +93,9 @@ impl TimeSpan {
     /// // Leading/trailing whitespace is accepted
     /// assert!(TimeSpan::parse("  01:30:00  ").is_ok());
     ///
-    /// // Bad syntax → various ParseErrorKind variants; value out of range → Overflow
-    /// assert_eq!(TimeSpan::parse("garbage").unwrap_err().kind, ParseErrorKind::InvalidCharacter);
-    /// assert_eq!(TimeSpan::parse("00:00:60").unwrap_err().kind, ParseErrorKind::Overflow);
+    /// // Bad syntax or out-of-range value produce descriptive errors
+    /// assert!(TimeSpan::parse("garbage").unwrap_err().to_string().contains("invalid character"));
+    /// assert!(TimeSpan::parse("00:00:60").unwrap_err().to_string().contains("outside the representable range"));
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         Self::parse_with_culture(s, Locale::en)
@@ -104,15 +104,17 @@ impl TimeSpan {
     /// Parses using the decimal separator of the given locale.
     ///
     /// ```
-    /// use cs_timespan::{ParseErrorKind, TimeSpan, Locale};
+    /// use cs_timespan::{TimeSpan, Locale};
     ///
     /// // Croatian locale uses ',' as the decimal separator
     /// assert!(TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr).is_ok());
     ///
     /// // A '.' separator is invalid for that locale
-    /// assert_eq!(
-    ///     TimeSpan::parse_with_culture("6:12:14:45.348", Locale::hr).unwrap_err().kind,
-    ///     ParseErrorKind::WrongSeparator,
+    /// assert!(
+    ///     TimeSpan::parse_with_culture("6:12:14:45.348", Locale::hr)
+    ///         .unwrap_err()
+    ///         .to_string()
+    ///         .contains("decimal separator"),
     /// );
     /// ```
     pub fn parse_with_culture(s: &str, locale: Locale) -> Result<Self, ParseError> {

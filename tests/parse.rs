@@ -11,7 +11,7 @@
 // - C# `new TimeSpan(d, h, m, s, ms)` → `ts5(d, h, m, s, ms)` (5-arg)
 // - C# `new TimeSpan(ticks)`         → `TimeSpan::from_ticks(ticks)`
 
-use cs_timespan::{Locale, ParseError, ParseErrorKind, TimeSpan};
+use cs_timespan::{Locale, TimeSpan};
 
 // ── en-US behaves identically to Invariant (both use '.' as decimal separator) ─
 
@@ -32,8 +32,10 @@ fn parse_en_us_rejects_comma_separator() {
     assert_eq!(
         TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::InvalidCharacter,
+            .to_string(),
+        r#"input contains an invalid character
+  "6:12:14:45,348"
+             ^"#,
     );
 }
 
@@ -264,86 +266,109 @@ fn parse_valid_croatian_culture_comma_separator() {
 
 #[test]
 fn parse_invalid_empty_string() {
-    assert_eq!(TimeSpan::parse("").unwrap_err().kind, ParseErrorKind::Empty);
+    assert_eq!(
+        TimeSpan::parse("").unwrap_err().to_string(),
+        r#"input is empty
+  ""
+   ^"#,
+    );
 }
 
 #[test]
 fn parse_invalid_lone_minus() {
     assert_eq!(
-        TimeSpan::parse("-").unwrap_err().kind,
-        ParseErrorKind::Empty
+        TimeSpan::parse("-").unwrap_err().to_string(),
+        r#"input is empty
+  "-"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_garbage() {
     assert_eq!(
-        TimeSpan::parse("garbage").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("garbage").unwrap_err().to_string(),
+        r#"input contains an invalid character
+  "garbage"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_date_like_string() {
     assert_eq!(
-        TimeSpan::parse("12/12/12").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("12/12/12").unwrap_err().to_string(),
+        r#"input contains an invalid character
+  "12/12/12"
+     ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_trailing_colon() {
     assert_eq!(
-        TimeSpan::parse("00:").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure
+        TimeSpan::parse("00:").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "00:"
+      ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_negative_component() {
     assert_eq!(
-        TimeSpan::parse("00:00:-01").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("00:00:-01").unwrap_err().to_string(),
+        r#"input contains an invalid character
+  "00:00:-01"
+         ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_embedded_null_chars() {
     assert_eq!(
-        TimeSpan::parse("\x0012:34:56").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("\x0012:34:56").unwrap_err().to_string(),
+        "input contains an invalid character\n  \"\x0012:34:56\"\n   ^",
     );
     assert_eq!(
-        TimeSpan::parse("1\x0002:34:56").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("1\x0002:34:56").unwrap_err().to_string(),
+        "input contains an invalid character\n  \"1\x0002:34:56\"\n    ^",
     );
     assert_eq!(
-        TimeSpan::parse("12\x00:34:56").unwrap_err().kind,
-        ParseErrorKind::InvalidCharacter
+        TimeSpan::parse("12\x00:34:56").unwrap_err().to_string(),
+        "input contains an invalid character\n  \"12\x00:34:56\"\n     ^",
     );
 }
 
 #[test]
 fn parse_invalid_double_colon() {
     assert_eq!(
-        TimeSpan::parse("00:00::00").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure
+        TimeSpan::parse("00:00::00").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "00:00::00"
+         ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_trailing_colon_after_seconds() {
     assert_eq!(
-        TimeSpan::parse("00:00:00:").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure
+        TimeSpan::parse("00:00:00:").unwrap_err().to_string(),
+        r#"input has an unrecognised component structure
+  "00:00:00:"
+            ^"#,
     );
 }
 
 #[test]
 fn parse_invalid_too_many_components() {
     assert_eq!(
-        TimeSpan::parse("00:00:00:00:00:00:00:00").unwrap_err().kind,
-        ParseErrorKind::InvalidStructure,
+        TimeSpan::parse("00:00:00:00:00:00:00:00")
+            .unwrap_err()
+            .to_string(),
+        r#"input has an unrecognised component structure
+  "00:00:00:00:00:00:00:00"
+   ^"#,
     );
 }
 
@@ -353,8 +378,10 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
     assert_eq!(
         TimeSpan::parse_with_culture("6:12:14:45.3448", Locale::hr)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::WrongSeparator,
+            .to_string(),
+        r#"decimal separator does not match the locale
+  "6:12:14:45.3448"
+             ^"#,
     );
 }
 
@@ -368,8 +395,10 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
 fn parse_overflow_too_many_fractional_digits() {
     // No leading zeros: value (99999999) > MaxFraction → Overflow
     assert_eq!(
-        TimeSpan::parse("1:1:1.99999999").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("1:1:1.99999999").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "1:1:1.99999999"
+         ^"#,
     );
 }
 
@@ -386,64 +415,96 @@ fn parse_frac_leading_zeros_beyond_7_rounds_to_nearest_tick() {
 #[test]
 fn parse_overflow_days_exceed_max() {
     assert_eq!(
-        TimeSpan::parse("2147483647").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("2147483647").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "2147483647"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("2147483648").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("2147483648").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "2147483648"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("10675200").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("10675200").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675200"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("10675200:00:00").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("10675200:00:00").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675200:00:00"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_overflow_exceeds_max_value() {
     assert_eq!(
-        TimeSpan::parse("10675199:03:00:00").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse("10675199:03:00:00")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675199:03:00:00"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("10675199:02:49:00").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse("10675199:02:49:00")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675199:02:49:00"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("10675199:02:48:06").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse("10675199:02:48:06")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675199:02:48:06"
+   ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("-10675199:02:48:06").unwrap_err().kind,
-        ParseErrorKind::Overflow,
+        TimeSpan::parse("-10675199:02:48:06")
+            .unwrap_err()
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "-10675199:02:48:06"
+   ^"#,
     );
     assert_eq!(
         TimeSpan::parse_with_culture("10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::Overflow,
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "10675199:02:48:05.4776"
+   ^"#,
     );
     assert_eq!(
         TimeSpan::parse_with_culture("-10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
-            .kind,
-        ParseErrorKind::Overflow,
+            .to_string(),
+        r#"TimeSpan value is outside the representable range
+  "-10675199:02:48:05.4776"
+   ^"#,
     );
 }
 
 #[test]
 fn parse_overflow_seconds_or_minutes_out_of_range() {
     assert_eq!(
-        TimeSpan::parse("00:00:60").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("00:00:60").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "00:00:60"
+         ^"#,
     );
     assert_eq!(
-        TimeSpan::parse("00:60:00").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("00:60:00").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "00:60:00"
+      ^"#,
     );
 }
 
@@ -451,7 +512,9 @@ fn parse_overflow_seconds_or_minutes_out_of_range() {
 fn parse_overflow_ambiguous_hour_colon() {
     // "24:00" is ambiguous — treated as hours exceeding max per-component range
     assert_eq!(
-        TimeSpan::parse("24:00").unwrap_err().kind,
-        ParseErrorKind::Overflow
+        TimeSpan::parse("24:00").unwrap_err().to_string(),
+        r#"TimeSpan value is outside the representable range
+  "24:00"
+   ^"#,
     );
 }
