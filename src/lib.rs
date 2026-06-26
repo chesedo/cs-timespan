@@ -94,7 +94,7 @@ impl TimeSpan {
     /// assert!(TimeSpan::parse("  01:30:00  ").is_ok());
     ///
     /// // Bad syntax or out-of-range value produce descriptive errors
-    /// assert!(TimeSpan::parse("garbage").unwrap_err().to_string().contains("invalid character"));
+    /// assert!(TimeSpan::parse("garbage").unwrap_err().to_string().contains("expected a digit"));
     /// assert!(TimeSpan::parse("00:00:60").unwrap_err().to_string().contains("outside the representable range"));
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {

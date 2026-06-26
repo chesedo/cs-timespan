@@ -33,7 +33,7 @@ fn parse_en_us_rejects_comma_separator() {
         TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character ','; expected a digit
   "6:12:14:45,348"
              ^"#,
     );
@@ -288,7 +288,7 @@ fn parse_invalid_lone_minus() {
 fn parse_invalid_garbage() {
     assert_eq!(
         TimeSpan::parse("garbage").unwrap_err().to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character 'g'; expected a digit
   "garbage"
    ^"#,
     );
@@ -298,7 +298,7 @@ fn parse_invalid_garbage() {
 fn parse_invalid_date_like_string() {
     assert_eq!(
         TimeSpan::parse("12/12/12").unwrap_err().to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character '/'; expected a digit
   "12/12/12"
      ^"#,
     );
@@ -318,7 +318,7 @@ fn parse_invalid_trailing_colon() {
 fn parse_invalid_negative_component() {
     assert_eq!(
         TimeSpan::parse("00:00:-01").unwrap_err().to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character '-'; expected a digit
   "00:00:-01"
          ^"#,
     );
@@ -328,15 +328,15 @@ fn parse_invalid_negative_component() {
 fn parse_invalid_embedded_null_chars() {
     assert_eq!(
         TimeSpan::parse("\x0012:34:56").unwrap_err().to_string(),
-        "input contains an invalid character\n  \"\x0012:34:56\"\n   ^",
+        "unexpected character '\\0'; expected a digit\n  \"\x0012:34:56\"\n   ^",
     );
     assert_eq!(
         TimeSpan::parse("1\x0002:34:56").unwrap_err().to_string(),
-        "input contains an invalid character\n  \"1\x0002:34:56\"\n    ^",
+        "unexpected character '\\0'; expected a digit\n  \"1\x0002:34:56\"\n    ^",
     );
     assert_eq!(
         TimeSpan::parse("12\x00:34:56").unwrap_err().to_string(),
-        "input contains an invalid character\n  \"12\x00:34:56\"\n     ^",
+        "unexpected character '\\0'; expected a digit\n  \"12\x00:34:56\"\n     ^",
     );
 }
 

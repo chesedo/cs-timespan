@@ -12,7 +12,7 @@ pub enum ParseErrorKind {
     Empty,
     /// A non-digit character appeared where only digits are valid, or the
     /// input contains a null byte.
-    InvalidCharacter,
+    NonDigit,
     /// The decimal separator in the input does not match the locale
     /// (e.g. `'.'` when the locale uses `','`).
     WrongSeparator,
@@ -54,7 +54,13 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
             ParseErrorKind::Empty => writeln!(f, "input is empty")?,
-            ParseErrorKind::InvalidCharacter => writeln!(f, "input contains an invalid character")?,
+            ParseErrorKind::NonDigit => {
+                let found = self.input[self.pos..].chars().next();
+                match found {
+                    Some(ch) => writeln!(f, "unexpected character {ch:?}; expected a digit")?,
+                    None => writeln!(f, "unexpected end of input; expected a digit")?,
+                }
+            }
             ParseErrorKind::WrongSeparator => {
                 writeln!(f, "decimal separator does not match the locale")?
             }
@@ -171,7 +177,7 @@ fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
     }
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
-            ParseErrorKind::InvalidCharacter,
+            ParseErrorKind::NonDigit,
             base + i,
             original,
         ));
@@ -191,7 +197,7 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
     }
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
-            ParseErrorKind::InvalidCharacter,
+            ParseErrorKind::NonDigit,
             base + i,
             original,
         ));
@@ -826,7 +832,7 @@ fn read_exact_str<'a>(inp: &mut &'a str, n: usize, original: &str) -> Result<&'a
     }
     if let Some(i) = inp[..n].bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
-            ParseErrorKind::InvalidCharacter,
+            ParseErrorKind::NonDigit,
             offset_of(original, inp) + i,
             original,
         ));

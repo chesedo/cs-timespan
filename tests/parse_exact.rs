@@ -354,22 +354,22 @@ fn parse_exact_invalid_garbage() {
 #[test]
 fn parse_exact_invalid_wrong_separator() {
     // '?' replaces the first colon → day_hour = "1?59", no dot, hours = "1?59"
-    // → non-digit in hours field → InvalidCharacter
+    // → non-digit in hours field → NonDigit
     assert_eq!(
         TimeSpan::parse_exact("1?59:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character '?'; expected a digit
   "1?59:02"
     ^"#,
     );
-    // '?' replaces the second colon → minutes = "59?02", non-digit → InvalidCharacter
+    // '?' replaces the second colon → minutes = "59?02", non-digit → NonDigit
     // (seconds are optional since C# ParseTime line 1384; the '?' lands in minutes)
     assert_eq!(
         TimeSpan::parse_exact("1:59?02", "c")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character '?'; expected a digit
   "1:59?02"
        ^"#,
     );
@@ -378,7 +378,7 @@ fn parse_exact_invalid_wrong_separator() {
         TimeSpan::parse_exact("1:59:02?123", "c")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character '?'; expected a digit
   "1:59:02?123"
           ^"#,
     );
@@ -391,7 +391,7 @@ fn parse_exact_c_rejects_d_colon_form() {
         TimeSpan::parse_exact("1:12:24:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character ':'; expected a digit
   "1:12:24:02"
           ^"#,
     );
@@ -847,7 +847,7 @@ fn parse_exact_invalid_custom_wrong_digit_count_for_padded() {
         TimeSpan::parse_exact("12.5:2:3", r"d\.hh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character ':'; expected a digit
   "12.5:2:3"
        ^"#,
     );
@@ -855,7 +855,7 @@ fn parse_exact_invalid_custom_wrong_digit_count_for_padded() {
         TimeSpan::parse_exact("12.5:2", r"d\.hh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input contains an invalid character
+        r#"unexpected character ':'; expected a digit
   "12.5:2"
        ^"#,
     );
