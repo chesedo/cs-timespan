@@ -3,7 +3,7 @@ pub use num_format::Locale;
 mod fmt;
 mod parse;
 pub use fmt::{FormatError, FormatErrorKind};
-pub use parse::{ParseError, TimeSpanStyles};
+pub use parse::{ParseError, ParseErrorKind, TimeSpanStyles};
 
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
 ///
@@ -85,7 +85,7 @@ impl TimeSpan {
     /// `h:mm:ss`, `d.hh:mm:ss`, `d:h:mm:ss`, with optional fractional seconds.
     ///
     /// ```
-    /// use cs_timespan::{ParseError, TimeSpan};
+    /// use cs_timespan::{ParseErrorKind, TimeSpan};
     ///
     /// assert_eq!(TimeSpan::parse("1:02:03").unwrap().ticks(), 37_230_000_000);
     /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().ticks(), 937_840_000_000);
@@ -93,9 +93,9 @@ impl TimeSpan {
     /// // Leading/trailing whitespace is accepted
     /// assert!(TimeSpan::parse("  01:30:00  ").is_ok());
     ///
-    /// // Bad syntax → various ParseError variants; value out of range → Overflow
-    /// assert_eq!(TimeSpan::parse("garbage"), Err(ParseError::InvalidCharacter));
-    /// assert_eq!(TimeSpan::parse("00:00:60"), Err(ParseError::Overflow));
+    /// // Bad syntax → various ParseErrorKind variants; value out of range → Overflow
+    /// assert_eq!(TimeSpan::parse("garbage").unwrap_err().kind, ParseErrorKind::InvalidCharacter);
+    /// assert_eq!(TimeSpan::parse("00:00:60").unwrap_err().kind, ParseErrorKind::Overflow);
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         Self::parse_with_culture(s, Locale::en)
@@ -104,15 +104,15 @@ impl TimeSpan {
     /// Parses using the decimal separator of the given locale.
     ///
     /// ```
-    /// use cs_timespan::{ParseError, TimeSpan, Locale};
+    /// use cs_timespan::{ParseErrorKind, TimeSpan, Locale};
     ///
     /// // Croatian locale uses ',' as the decimal separator
     /// assert!(TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr).is_ok());
     ///
     /// // A '.' separator is invalid for that locale
     /// assert_eq!(
-    ///     TimeSpan::parse_with_culture("6:12:14:45.348", Locale::hr),
-    ///     Err(ParseError::WrongSeparator),
+    ///     TimeSpan::parse_with_culture("6:12:14:45.348", Locale::hr).unwrap_err().kind,
+    ///     ParseErrorKind::WrongSeparator,
     /// );
     /// ```
     pub fn parse_with_culture(s: &str, locale: Locale) -> Result<Self, ParseError> {
@@ -141,7 +141,7 @@ impl TimeSpan {
         formats: &[&str],
         locale: Locale,
     ) -> Result<Self, ParseError> {
-        let mut last = ParseError::InvalidStructure;
+        let mut last = ParseError::new(ParseErrorKind::InvalidStructure, 0, s);
         for fmt in formats {
             match Self::parse_exact_with_culture(s, fmt, locale) {
                 Ok(ts) => return Ok(ts),

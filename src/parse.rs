@@ -1,10 +1,12 @@
 use crate::TimeSpan;
 
+/// The category of error returned when a time-span string fails to parse.
+///
 /// Mirrors the two distinct failure modes C# separates into
 /// `FormatException` (bad syntax) and `OverflowException` (out of range),
 /// with the format case split into more actionable variants.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseError {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseErrorKind {
     /// Input is empty or whitespace-only, or reduces to nothing after
     /// stripping a leading `-`.
     Empty,
@@ -22,19 +24,59 @@ pub enum ParseError {
     Overflow,
 }
 
+/// Error returned when a time-span string fails to parse.
+///
+/// Carries the [`kind`](ParseError::kind) of error, the byte [`pos`](ParseError::pos)
+/// where it was detected, and the original input string for display purposes.
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub kind: ParseErrorKind,
+    pos: usize,
+    input: Box<str>,
+}
+
+impl ParseError {
+    pub(crate) fn new(kind: ParseErrorKind, pos: usize, input: &str) -> Self {
+        Self {
+            kind,
+            pos,
+            input: input.into(),
+        }
+    }
+
+    /// Byte index (0-based) of the offending character in the input string.
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Empty => f.write_str("input is empty"),
-            Self::InvalidCharacter => f.write_str("input contains an invalid character"),
-            Self::WrongSeparator => f.write_str("decimal separator does not match the locale"),
-            Self::InvalidStructure => f.write_str("input has an unrecognised component structure"),
-            Self::Overflow => f.write_str("TimeSpan value is outside the representable range"),
+        match self.kind {
+            ParseErrorKind::Empty => writeln!(f, "input is empty")?,
+            ParseErrorKind::InvalidCharacter => writeln!(f, "input contains an invalid character")?,
+            ParseErrorKind::WrongSeparator => {
+                writeln!(f, "decimal separator does not match the locale")?
+            }
+            ParseErrorKind::InvalidStructure => {
+                writeln!(f, "input has an unrecognised component structure")?
+            }
+            ParseErrorKind::Overflow => {
+                writeln!(f, "TimeSpan value is outside the representable range")?
+            }
         }
+        writeln!(f, "  \"{}\"", self.input)?;
+        write!(f, "   {}^", " ".repeat(self.pos))
     }
 }
 
 impl std::error::Error for ParseError {}
+
+impl PartialEq for ParseError {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
 
 /// Mirrors `System.Globalization.TimeSpanStyles`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -47,9 +89,9 @@ pub enum TimeSpanStyles {
 
 // ── Builder ───────────────────────────────────────────────────────────────────
 
-#[derive(Default)]
 struct Builder<'a> {
     neg: bool,
+    original: &'a str,
     days: Option<&'a str>,
     hours: Option<&'a str>,
     minutes: Option<&'a str>,
@@ -58,56 +100,101 @@ struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
-    fn new(neg: bool) -> Self {
+    fn new(neg: bool, original: &'a str) -> Self {
         Self {
             neg,
-            ..Default::default()
+            original,
+            days: None,
+            hours: None,
+            minutes: None,
+            seconds: None,
+            frac: None,
         }
     }
 
     fn build(self) -> Result<TimeSpan, ParseError> {
-        let days = parse_component_uint(self.days)?;
-        let h = parse_component_uint(self.hours)? as u32;
-        let m = parse_component_uint(self.minutes)? as u32;
-        let sv = parse_component_uint(self.seconds)? as u32;
-        let frac = parse_component_frac(self.frac)?;
-        if h >= 24 || m >= 60 || sv >= 60 {
-            return Err(ParseError::Overflow);
+        let days = parse_component_uint(self.days, self.original)?;
+        let h = parse_component_uint(self.hours, self.original)? as u32;
+        let m = parse_component_uint(self.minutes, self.original)? as u32;
+        let sv = parse_component_uint(self.seconds, self.original)? as u32;
+        let frac = parse_component_frac(self.frac, self.original)?;
+        if h >= 24 {
+            let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
+            return Err(ParseError::new(
+                ParseErrorKind::Overflow,
+                pos,
+                self.original,
+            ));
         }
-        build_ticks(self.neg, days, h, m, sv, frac)
+        if m >= 60 {
+            let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
+            return Err(ParseError::new(
+                ParseErrorKind::Overflow,
+                pos,
+                self.original,
+            ));
+        }
+        if sv >= 60 {
+            let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
+            return Err(ParseError::new(
+                ParseErrorKind::Overflow,
+                pos,
+                self.original,
+            ));
+        }
+        build_ticks(self.neg, days, h, m, sv, frac, self.original)
     }
 }
 
-fn parse_component_uint(s: Option<&str>) -> Result<u64, ParseError> {
+fn parse_component_uint(s: Option<&str>, original: &str) -> Result<u64, ParseError> {
     match s {
         None | Some("") => Ok(0),
-        Some(s) => parse_uint(s),
+        Some(s) => parse_uint(s, original),
     }
 }
 
-fn parse_component_frac(s: Option<&str>) -> Result<u32, ParseError> {
+fn parse_component_frac(s: Option<&str>, original: &str) -> Result<u32, ParseError> {
     match s {
         None => Ok(0),
-        Some(s) => parse_frac(s),
+        Some(s) => parse_frac(s, original),
     }
 }
 
-fn parse_uint(s: &str) -> Result<u64, ParseError> {
+fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
+    let base = offset_of(original, s);
     if s.is_empty() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            base,
+            original,
+        ));
     }
-    if !s.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(ParseError::InvalidCharacter);
+    if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidCharacter,
+            base + i,
+            original,
+        ));
     }
-    s.parse::<u64>().map_err(|_| ParseError::Overflow)
+    s.parse::<u64>()
+        .map_err(|_| ParseError::new(ParseErrorKind::Overflow, base, original))
 }
 
-fn parse_frac(s: &str) -> Result<u32, ParseError> {
+fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
+    let base = offset_of(original, s);
     if s.is_empty() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            base,
+            original,
+        ));
     }
-    if !s.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(ParseError::InvalidCharacter);
+    if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidCharacter,
+            base + i,
+            original,
+        ));
     }
     let total = s.len();
     if total <= 7 {
@@ -119,7 +206,7 @@ fn parse_frac(s: &str) -> Result<u32, ParseError> {
     // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
     let zeroes = s.bytes().take_while(|&b| b == b'0').count();
     if zeroes == 0 {
-        return Err(ParseError::Overflow);
+        return Err(ParseError::new(ParseErrorKind::Overflow, base, original));
     }
     if zeroes > 7 {
         return Ok(0);
@@ -131,7 +218,12 @@ fn parse_frac(s: &str) -> Result<u32, ParseError> {
     Ok(((num + power / 2) / power) as u32)
 }
 
-// ── Low-level validators ──────────────────────────────────────────────────────
+// ── Low-level helpers ─────────────────────────────────────────────────────────
+
+/// Byte offset of `sub` within `original`. Both must originate from the same allocation.
+fn offset_of(original: &str, sub: &str) -> usize {
+    (sub.as_ptr() as usize).saturating_sub(original.as_ptr() as usize)
+}
 
 fn build_ticks(
     neg: bool,
@@ -140,25 +232,27 @@ fn build_ticks(
     m: u32,
     s: u32,
     frac: u32,
+    original: &str,
 ) -> Result<TimeSpan, ParseError> {
+    let overflow = || ParseError::new(ParseErrorKind::Overflow, 0, original);
     let ticks = (days as u128)
         .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
         .and_then(|t| t.checked_add(h as u128 * TimeSpan::TICKS_PER_HOUR as u128))
         .and_then(|t| t.checked_add(m as u128 * TimeSpan::TICKS_PER_MINUTE as u128))
         .and_then(|t| t.checked_add(s as u128 * TimeSpan::TICKS_PER_SECOND as u128))
         .and_then(|t| t.checked_add(frac as u128))
-        .ok_or(ParseError::Overflow)?;
+        .ok_or_else(overflow)?;
     if neg {
         const ABS_MIN: u128 = (i64::MAX as u128) + 1;
         if ticks > ABS_MIN {
-            return Err(ParseError::Overflow);
+            return Err(overflow());
         } else if ticks == ABS_MIN {
             return Ok(TimeSpan::from_ticks(i64::MIN));
         }
         Ok(TimeSpan::from_ticks(-(ticks as i64)))
     } else {
         if ticks > i64::MAX as u128 {
-            return Err(ParseError::Overflow);
+            return Err(overflow());
         }
         Ok(TimeSpan::from_ticks(ticks as i64))
     }
@@ -170,24 +264,29 @@ fn build_ticks(
 pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
     let (neg, s) = strip_neg(input.trim());
     if s.is_empty() {
-        return Err(ParseError::Empty);
+        return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
     let mut it = s.split(':');
-    let head = it.next().ok_or(ParseError::InvalidStructure)?;
+    let head = it.next().unwrap(); // split always yields at least one item
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
     if it.next().is_some() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
     }
 
     // No colons → bare days only (d.anything requires a colon for the time part).
     if p1.is_none() {
         if head.contains('.') {
-            return Err(ParseError::InvalidStructure);
+            let pos = offset_of(input, head) + head.find('.').unwrap();
+            return Err(ParseError::new(
+                ParseErrorKind::InvalidStructure,
+                pos,
+                input,
+            ));
         }
-        let mut b = Builder::new(neg);
+        let mut b = Builder::new(neg, input);
         b.days = Some(head);
         return b.build();
     }
@@ -196,13 +295,18 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     let (days_str, first_s) = match head.split_once('.') {
         Some((d, h)) => {
             if d.is_empty() || h.is_empty() {
-                return Err(ParseError::InvalidStructure);
+                let pos = offset_of(input, head) + head.find('.').unwrap();
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    pos,
+                    input,
+                ));
             }
             (Some(d), h)
         }
         None => {
             if head.is_empty() {
-                return Err(ParseError::InvalidStructure);
+                return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
             }
             (None, head)
         }
@@ -215,16 +319,21 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
         Some((i, f)) => (i, Some(f)),
         None => {
             if sep != '.' && last.contains('.') {
-                return Err(ParseError::WrongSeparator);
+                let pos = offset_of(input, last) + last.find('.').unwrap();
+                return Err(ParseError::new(ParseErrorKind::WrongSeparator, pos, input));
             }
             (last, None)
         }
     };
     if last_int.is_empty() && frac_s.is_none() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(input, last),
+            input,
+        ));
     }
 
-    let mut b = Builder::new(neg);
+    let mut b = Builder::new(neg, input);
     b.frac = frac_s;
     b.days = days_str; // dot-prefix days; overridden by colon-prefix cases below
 
@@ -239,7 +348,11 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
         // d.h:m:s[.frac] — two colons with days-dot
         (true, Some(mid), Some(_), None) => {
             if mid.is_empty() {
-                return Err(ParseError::InvalidStructure);
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(input, mid),
+                    input,
+                ));
             }
             b.hours = Some(first_s);
             b.minutes = Some(mid);
@@ -248,9 +361,13 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
         // h:m:s[.frac] or d:h:m[.frac] when first > 23 — two colons, no days-dot
         (false, Some(mid), Some(_), None) => {
             if mid.is_empty() {
-                return Err(ParseError::InvalidStructure);
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(input, mid),
+                    input,
+                ));
             }
-            let first_val = parse_component_uint(Some(first_s))?;
+            let first_val = parse_component_uint(Some(first_s), input)?;
             if first_val > 23 {
                 b.days = Some(first_s);
                 b.hours = Some(mid);
@@ -264,14 +381,23 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
         // d:h:m:s[.frac] — three colons, no days-dot
         (false, Some(mid1), Some(mid2), Some(_)) => {
             if mid1.is_empty() || mid2.is_empty() {
-                return Err(ParseError::InvalidStructure);
+                let pos = if mid1.is_empty() {
+                    offset_of(input, mid1)
+                } else {
+                    offset_of(input, mid2)
+                };
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    pos,
+                    input,
+                ));
             }
             b.days = Some(first_s);
             b.hours = Some(mid1);
             b.minutes = Some(mid2);
             b.seconds = Some(last_int);
         }
-        _ => return Err(ParseError::InvalidStructure),
+        _ => return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input)),
     }
 
     b.build()
@@ -284,7 +410,7 @@ pub(crate) fn parse_exact(s: &str, fmt: &str, sep: char) -> Result<TimeSpan, Par
         "c" | "t" | "T" => parse_constant(s),
         "g" => parse_g(s, sep),
         "G" => parse_g_upper(s, sep),
-        "" => Err(ParseError::InvalidStructure),
+        "" => Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, s)),
         _ => parse_custom(s, fmt),
     }
 }
@@ -298,20 +424,24 @@ fn strip_neg(s: &str) -> (bool, &str) {
 }
 
 /// "c"/"t"/"T": `[-][d.]hh:mm[:ss[.fffffff]]`
-fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
-    let (neg, s) = strip_neg(s.trim());
+fn parse_constant(input: &str) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(input.trim());
     if s.is_empty() {
-        return Err(ParseError::Empty);
+        return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
     let mut it = s.splitn(3, ':');
-    let day_hour = it.next().ok_or(ParseError::InvalidStructure)?;
+    let day_hour = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
     let (days_str, hours_s) = match day_hour.split_once('.') {
         Some((d, h)) => (Some(d), h),
         None => (None, day_hour),
     };
 
-    let min = it.next().ok_or(ParseError::InvalidStructure)?;
+    let min = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
 
     // C# ParseTime (TimeSpanParse.cs line 1384): `if (_ch == ':')` makes the
     // second colon and seconds optional — "hh:mm" is a valid "c" input.
@@ -321,14 +451,18 @@ fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
             Some((s, f)) => (s, Some(f)),
             None => {
                 if sf.is_empty() {
-                    return Err(ParseError::InvalidStructure);
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, sf),
+                        input,
+                    ));
                 }
                 (sf, None)
             }
         },
     };
 
-    let mut b = Builder::new(neg);
+    let mut b = Builder::new(neg, input);
     b.days = days_str;
     b.hours = Some(hours_s);
     b.minutes = Some(min);
@@ -340,22 +474,22 @@ fn parse_constant(s: &str) -> Result<TimeSpan, ParseError> {
 /// "g": documented output format is `[-][d:]h:mm:ss[.FFFFFFF]`, but the C# runtime
 /// `ParseExact` also accepts reduced forms: bare `d` and `h:mm` without seconds.
 /// See: <https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs>
-fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
-    let (neg, s) = strip_neg(s.trim());
+fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(input.trim());
     if s.is_empty() {
-        return Err(ParseError::Empty);
+        return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
     let mut it = s.split(':');
-    let p0 = it.next().ok_or(ParseError::InvalidStructure)?;
+    let p0 = it.next().unwrap(); // split always yields at least one item
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
     if it.next().is_some() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
     }
 
-    let mut b = Builder::new(neg);
+    let mut b = Builder::new(neg, input);
 
     // bare d — no colons
     if p1.is_none() {
@@ -366,7 +500,7 @@ fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
     // h:mm — one colon, no seconds
     if p2.is_none() {
         if p0.contains(sep) {
-            return Err(ParseError::InvalidStructure);
+            return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -381,7 +515,11 @@ fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
         None => (last, None),
     };
     if sec_s.is_empty() && frac_s.is_none() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(input, sec_s),
+            input,
+        ));
     }
     b.frac = frac_s;
     b.seconds = Some(sec_s);
@@ -393,7 +531,7 @@ fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
     } else {
         // h:mm:ss — p0=h, p1=mm (p2 was last)
         if p0.contains(sep) {
-            return Err(ParseError::InvalidStructure);
+            return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -403,25 +541,37 @@ fn parse_g(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
 }
 
 /// "G": `[-]d:hh:mm:ss.fffffff` (fractional part required)
-fn parse_g_upper(s: &str, sep: char) -> Result<TimeSpan, ParseError> {
-    let (neg, s) = strip_neg(s.trim());
+fn parse_g_upper(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
+    let (neg, s) = strip_neg(input.trim());
     if s.is_empty() {
-        return Err(ParseError::Empty);
+        return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
     let mut it = s.split(':');
-    let days = it.next().ok_or(ParseError::InvalidStructure)?;
-    let h = it.next().ok_or(ParseError::InvalidStructure)?;
-    let min = it.next().ok_or(ParseError::InvalidStructure)?;
-    let sec_frac = it.next().ok_or(ParseError::InvalidStructure)?;
+    let days = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
+    let h = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
+    let min = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
+    let sec_frac = it
+        .next()
+        .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidStructure, 0, input))?;
     if it.next().is_some() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
     }
-    let (sec_s, frac_s) = sec_frac
-        .split_once(sep)
-        .ok_or(ParseError::InvalidStructure)?;
+    let (sec_s, frac_s) = sec_frac.split_once(sep).ok_or_else(|| {
+        ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(input, sec_frac),
+            input,
+        )
+    })?;
 
-    let mut b = Builder::new(neg);
+    let mut b = Builder::new(neg, input);
     b.days = Some(days);
     b.hours = Some(h);
     b.minutes = Some(min);
@@ -435,20 +585,30 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
     // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
     if fmt.chars().count() < 2 {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(ParseErrorKind::InvalidStructure, 0, input));
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;
-    let mut b = Builder::new(false);
+    let mut b = Builder::new(false, input);
 
     while let Some(mut ch) = it.next() {
         // C# TryParseByFormat: '%' consumes itself then re-enters the full switch
         // (including ParseRepeatPattern) on the next character — it is a transparent
         // pass-through. '%' at end-of-format or '%%' are both errors.
         if ch == '%' {
-            ch = it.next().ok_or(ParseError::InvalidStructure)?;
+            ch = it.next().ok_or_else(|| {
+                ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(input, inp),
+                    input,
+                )
+            })?;
             if ch == '%' {
-                return Err(ParseError::InvalidStructure);
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(input, inp),
+                    input,
+                ));
             }
         }
         match ch {
@@ -464,15 +624,35 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                     _ => 7,
                 };
                 if n > max {
-                    return Err(ParseError::InvalidStructure);
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
-                apply_spec(ch, n, &mut inp, &mut b)?;
+                apply_spec(ch, n, &mut inp, &mut b, input)?;
             }
             '\\' => {
-                let expected = it.next().ok_or(ParseError::InvalidStructure)?;
-                let got = inp.chars().next().ok_or(ParseError::InvalidStructure)?;
+                let expected = it.next().ok_or_else(|| {
+                    ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    )
+                })?;
+                let got = inp.chars().next().ok_or_else(|| {
+                    ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    )
+                })?;
                 if got != expected {
-                    return Err(ParseError::InvalidStructure);
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
                 inp = &inp[got.len_utf8()..];
             }
@@ -483,7 +663,13 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                 // '\' inside a quoted literal escapes the next character.
                 while let Some(c) = it.next() {
                     if c == '\\' {
-                        let escaped = it.next().ok_or(ParseError::InvalidStructure)?;
+                        let escaped = it.next().ok_or_else(|| {
+                            ParseError::new(
+                                ParseErrorKind::InvalidStructure,
+                                offset_of(input, inp),
+                                input,
+                            )
+                        })?;
                         lit.push(escaped);
                     } else if c == q {
                         closed = true;
@@ -493,19 +679,37 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                     }
                 }
                 if !closed {
-                    return Err(ParseError::InvalidStructure);
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
                 if !inp.starts_with(lit.as_str()) {
-                    return Err(ParseError::InvalidStructure);
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidStructure,
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
                 inp = &inp[lit.len()..];
             }
-            _ => return Err(ParseError::InvalidStructure),
+            _ => {
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(input, inp),
+                    input,
+                ));
+            }
         }
     }
 
     if !inp.is_empty() {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(input, inp),
+            input,
+        ));
     }
     b.build()
 }
@@ -515,11 +719,16 @@ fn apply_spec<'a>(
     n: usize,
     inp: &mut &'a str,
     b: &mut Builder<'a>,
+    original: &str,
 ) -> Result<(), ParseError> {
     macro_rules! dup {
         ($field:expr) => {
             if $field.is_some() {
-                return Err(ParseError::InvalidStructure);
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidStructure,
+                    offset_of(original, inp),
+                    original,
+                ));
             }
         };
     }
@@ -527,38 +736,38 @@ fn apply_spec<'a>(
         'd' => {
             dup!(b.days);
             b.days = Some(if n == 1 {
-                read_greedy_str(inp, 8)?
+                read_greedy_str(inp, 8, original)?
             } else {
-                read_exact_str(inp, n)?
+                read_exact_str(inp, n, original)?
             });
         }
         'h' => {
             dup!(b.hours);
             b.hours = Some(if n == 1 {
-                read_greedy_str(inp, 2)?
+                read_greedy_str(inp, 2, original)?
             } else {
-                read_exact_str(inp, n)?
+                read_exact_str(inp, n, original)?
             });
         }
         'm' => {
             dup!(b.minutes);
             b.minutes = Some(if n == 1 {
-                read_greedy_str(inp, 2)?
+                read_greedy_str(inp, 2, original)?
             } else {
-                read_exact_str(inp, n)?
+                read_exact_str(inp, n, original)?
             });
         }
         's' => {
             dup!(b.seconds);
             b.seconds = Some(if n == 1 {
-                read_greedy_str(inp, 2)?
+                read_greedy_str(inp, 2, original)?
             } else {
-                read_exact_str(inp, n)?
+                read_exact_str(inp, n, original)?
             });
         }
         'f' => {
             dup!(b.frac);
-            b.frac = Some(read_exact_str(inp, n)?);
+            b.frac = Some(read_exact_str(inp, n, original)?);
         }
         'F' => {
             dup!(b.frac);
@@ -574,31 +783,53 @@ fn apply_spec<'a>(
             }
             *inp = &inp[count..];
         }
-        _ => return Err(ParseError::InvalidStructure),
+        _ => {
+            return Err(ParseError::new(
+                ParseErrorKind::InvalidStructure,
+                offset_of(original, inp),
+                original,
+            ));
+        }
     }
     Ok(())
 }
 
-fn read_greedy_str<'a>(inp: &mut &'a str, max: usize) -> Result<&'a str, ParseError> {
+fn read_greedy_str<'a>(
+    inp: &mut &'a str,
+    max: usize,
+    original: &str,
+) -> Result<&'a str, ParseError> {
     let n = inp
         .bytes()
         .take(max)
         .take_while(|b| b.is_ascii_digit())
         .count();
     if n == 0 {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(original, inp),
+            original,
+        ));
     }
     let s = &inp[..n];
     *inp = &inp[n..];
     Ok(s)
 }
 
-fn read_exact_str<'a>(inp: &mut &'a str, n: usize) -> Result<&'a str, ParseError> {
+fn read_exact_str<'a>(inp: &mut &'a str, n: usize, original: &str) -> Result<&'a str, ParseError> {
     if inp.len() < n {
-        return Err(ParseError::InvalidStructure);
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidStructure,
+            offset_of(original, inp),
+            original,
+        ));
     }
-    if !inp[..n].bytes().all(|b| b.is_ascii_digit()) {
-        return Err(ParseError::InvalidCharacter);
+    if let Some(i) = inp[..n].bytes().position(|b| !b.is_ascii_digit()) {
+        return Err(ParseError::new(
+            ParseErrorKind::InvalidCharacter,
+            offset_of(original, inp) + i,
+            original,
+        ));
     }
     let s = &inp[..n];
     *inp = &inp[n..];
