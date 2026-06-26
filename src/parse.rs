@@ -81,33 +81,33 @@ impl<'a> Builder<'a> {
 fn parse_component_uint(s: Option<&str>) -> Result<u64, ParseError> {
     match s {
         None | Some("") => Ok(0),
-        Some(s) => parse_uint(s).map_err(Into::into),
+        Some(s) => parse_uint(s),
     }
 }
 
 fn parse_component_frac(s: Option<&str>) -> Result<u32, ParseError> {
     match s {
         None => Ok(0),
-        Some(s) => parse_frac(s).map_err(Into::into),
+        Some(s) => parse_frac(s),
     }
 }
 
-fn parse_uint(s: &str) -> Result<u64, UintError> {
+fn parse_uint(s: &str) -> Result<u64, ParseError> {
     if s.is_empty() {
-        return Err(UintError::Empty);
+        return Err(ParseError::InvalidStructure);
     }
     if !s.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(UintError::NonDigit);
+        return Err(ParseError::InvalidCharacter);
     }
-    s.parse::<u64>().map_err(|_| UintError::Overflow)
+    s.parse::<u64>().map_err(|_| ParseError::Overflow)
 }
 
-fn parse_frac(s: &str) -> Result<u32, FracError> {
+fn parse_frac(s: &str) -> Result<u32, ParseError> {
     if s.is_empty() {
-        return Err(FracError::Empty);
+        return Err(ParseError::InvalidStructure);
     }
     if !s.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(FracError::NonDigit);
+        return Err(ParseError::InvalidCharacter);
     }
     let total = s.len();
     if total <= 7 {
@@ -119,7 +119,7 @@ fn parse_frac(s: &str) -> Result<u32, FracError> {
     // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
     let zeroes = s.bytes().take_while(|&b| b == b'0').count();
     if zeroes == 0 {
-        return Err(FracError::TooLong);
+        return Err(ParseError::Overflow);
     }
     if zeroes > 7 {
         return Ok(0);
@@ -132,40 +132,6 @@ fn parse_frac(s: &str) -> Result<u32, FracError> {
 }
 
 // ── Low-level validators ──────────────────────────────────────────────────────
-
-#[derive(Debug, PartialEq, Eq)]
-enum UintError {
-    Empty,
-    NonDigit,
-    Overflow,
-}
-
-impl From<UintError> for ParseError {
-    fn from(e: UintError) -> Self {
-        match e {
-            UintError::Empty => ParseError::InvalidStructure,
-            UintError::NonDigit => ParseError::InvalidCharacter,
-            UintError::Overflow => ParseError::Overflow,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum FracError {
-    Empty,
-    NonDigit,
-    TooLong,
-}
-
-impl From<FracError> for ParseError {
-    fn from(e: FracError) -> Self {
-        match e {
-            FracError::Empty => ParseError::InvalidStructure,
-            FracError::NonDigit => ParseError::InvalidCharacter,
-            FracError::TooLong => ParseError::Overflow,
-        }
-    }
-}
 
 fn build_ticks(
     neg: bool,
