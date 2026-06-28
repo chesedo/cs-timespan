@@ -428,7 +428,7 @@ fn parse_exact_invalid_empty_format_string() {
         TimeSpan::parse_exact("00:00:00", "")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected non-empty custom format
+        r#"invalid custom format: empty format string
   "00:00:00"
    ^"#,
     );
@@ -441,13 +441,13 @@ fn parse_exact_invalid_empty_format_string() {
 fn parse_exact_invalid_single_char_custom_format() {
     assert_eq!(
         TimeSpan::parse_exact("5", "d").unwrap_err().to_string(),
-        r#"unrecognised input structure; expected d
+        r#"invalid custom format: 'd' is not a known format specifier
   "5"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("5", "h").unwrap_err().to_string(),
-        r#"unrecognised input structure; expected h
+        r#"invalid custom format: 'h' is not a known format specifier
   "5"
    ^"#,
     );
@@ -459,7 +459,7 @@ fn parse_exact_invalid_unknown_format_specifier() {
         TimeSpan::parse_exact("12.5:2", "V")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected V
+        r#"invalid custom format: 'V' is not a known format specifier
   "12.5:2"
    ^"#,
     );
@@ -469,13 +469,13 @@ fn parse_exact_invalid_unknown_format_specifier() {
 fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
         TimeSpan::parse_exact("1", r"d%").unwrap_err().to_string(),
-        r#"unrecognised input structure; expected d%
+        r#"invalid custom format: '%' at end of format must be followed by a specifier
   "1"
     ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("1", r"%%d").unwrap_err().to_string(),
-        r#"unrecognised input structure; expected %%d
+        r#"invalid custom format: '%%' is not valid; '%' must be followed by a single specifier character
   "1"
    ^"#,
     );
@@ -484,18 +484,10 @@ fn parse_exact_invalid_percent_not_alone() {
 #[test]
 fn parse_exact_invalid_repeated_specifier() {
     assert_eq!(
-        TimeSpan::parse_exact("12:34:56", r"hhh\:mm\:ss")
-            .unwrap_err()
-            .to_string(),
-        r#"unrecognised input structure; expected hhh\:mm\:ss
-  "12:34:56"
-   ^"#,
-    );
-    assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:hh\:ss")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected hh\:hh\:ss
+        r#"invalid custom format: duplicate 'h' specifier in format
   "12:34:56"
       ^"#,
     );
@@ -503,7 +495,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected hh\:mm\:mm
+        r#"invalid custom format: duplicate 'm' specifier in format
   "12:34:56"
          ^"#,
     );
@@ -511,7 +503,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected hh\:ss\:ss
+        r#"invalid custom format: duplicate 's' specifier in format
   "12:34:56"
          ^"#,
     );
@@ -549,10 +541,18 @@ fn parse_exact_invalid_wrong_digit_count() {
 #[test]
 fn parse_exact_invalid_triple_specifier() {
     assert_eq!(
+        TimeSpan::parse_exact("12:34:56", r"hhh\:mm\:ss")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: 'h' repeated 3 times; maximum is 2
+  "12:34:56"
+   ^"#,
+    );
+    assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mmm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected hh\:mmm\:ss
+        r#"invalid custom format: 'm' repeated 3 times; maximum is 2
   "12:34:56"
       ^"#,
     );
@@ -560,7 +560,7 @@ fn parse_exact_invalid_triple_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:sss")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected hh\:mm\:sss
+        r#"invalid custom format: 's' repeated 3 times; maximum is 2
   "12:34:56"
          ^"#,
     );
@@ -585,7 +585,7 @@ fn parse_exact_invalid_f_uppercase_too_many_chars() {
         TimeSpan::parse_exact("00000012", "FFFFFFFF")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected FFFFFFFF
+        r#"invalid custom format: 'F' repeated 8 times; maximum is 7
   "00000012"
    ^"#,
     );
@@ -598,7 +598,7 @@ fn parse_exact_invalid_d_too_many_specifiers() {
         TimeSpan::parse_exact("000000123", "ddddddddd")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected ddddddddd
+        r#"invalid custom format: 'd' repeated 9 times; maximum is 8
   "000000123"
    ^"#,
     );
@@ -607,22 +607,22 @@ fn parse_exact_invalid_d_too_many_specifiers() {
 #[test]
 fn parse_exact_invalid_duplicate_d_specifier() {
     assert_eq!(
-        TimeSpan::parse_exact("12:34:56", r"dd:dd:hh")
+        TimeSpan::parse_exact("12:34:56", r"dd\:dd\:hh")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected dd:dd:hh
+        r#"invalid custom format: duplicate 'd' specifier in format
   "12:34:56"
-     ^"#,
+      ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_too_many_digits_for_dd() {
     assert_eq!(
-        TimeSpan::parse_exact("123:45", r"dd:hh")
+        TimeSpan::parse_exact("123:45", r"dd\:hh")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected dd:hh
+        r#"unrecognised input structure; expected dd\:hh
   "123:45"
      ^"#,
     );
@@ -631,24 +631,24 @@ fn parse_exact_invalid_too_many_digits_for_dd() {
 #[test]
 fn parse_exact_invalid_unknown_specifier_vv() {
     assert_eq!(
-        TimeSpan::parse_exact("12:34", r"dd:vv")
+        TimeSpan::parse_exact("12:34", r"dd\:vv")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected dd:vv
+        r#"invalid custom format: unrecognised character 'v' in format string
   "12:34"
-     ^"#,
+      ^"#,
     );
 }
 
 #[test]
 fn parse_exact_invalid_ff_repeated() {
     assert_eq!(
-        TimeSpan::parse_exact("12:45", "ff:ff")
+        TimeSpan::parse_exact("12:45", r"ff\:ff")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected ff:ff
+        r#"invalid custom format: duplicate 'f' specifier in format
   "12:45"
-     ^"#,
+      ^"#,
     );
 }
 
@@ -658,7 +658,7 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
         TimeSpan::parse_exact("12:34 minutes", r#"mm\:ss\ "minutes"#)
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected mm\:ss\ "minutes
+        r#"invalid custom format: unclosed '"' in format string
   "12:34 minutes"
          ^"#,
     );
@@ -670,7 +670,7 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
         TimeSpan::parse_exact("12:34 minutes", r"mm\:ss\ 'minutes")
             .unwrap_err()
             .to_string(),
-        r#"unrecognised input structure; expected mm\:ss\ 'minutes
+        r#"invalid custom format: unclosed '\'' in format string
   "12:34 minutes"
          ^"#,
     );

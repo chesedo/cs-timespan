@@ -19,6 +19,9 @@ pub enum ParseErrorKind {
     /// The component structure is unrecognised. The payload names the
     /// expected pattern (e.g. `"[-][d.]hh:mm[:ss[.fffffff]]"`).
     InvalidStructure(Box<str>),
+    /// The custom format string is itself malformed. The payload describes
+    /// what is wrong with the format (e.g. `"duplicate 'h' specifier in format"`).
+    InvalidFormat(Box<str>),
     /// The value is syntactically valid but outside the representable range
     /// (`OverflowException`).
     Overflow,
@@ -76,6 +79,7 @@ impl std::fmt::Display for ParseError {
             ParseErrorKind::InvalidStructure(expected) => {
                 writeln!(f, "unrecognised input structure; expected {expected}")?
             }
+            ParseErrorKind::InvalidFormat(desc) => writeln!(f, "invalid custom format: {desc}")?,
             ParseErrorKind::Overflow => {
                 writeln!(f, "TimeSpan value is outside the representable range")?
             }
@@ -280,6 +284,10 @@ fn invalid_structure(expected: &str, pos: usize, input: &str) -> ParseError {
     )
 }
 
+fn invalid_format(desc: &str, pos: usize, input: &str) -> ParseError {
+    ParseError::new(ParseErrorKind::InvalidFormat(desc.into()), pos, input)
+}
+
 // ── Lenient parser (parse / parse_with_culture) ───────────────────────────────
 
 /// Lenient: `[-]{d | [d.]h:mm[:ss[.FFFFFFF]] | d:h:mm:ss[.FFFFFFF]}`
@@ -420,7 +428,7 @@ pub(crate) fn parse_exact(s: &str, fmt: &str, sep: char) -> Result<TimeSpan, Par
         "c" | "t" | "T" => parse_constant(s),
         "g" => parse_g(s, sep),
         "G" => parse_g_upper(s, sep),
-        "" => Err(invalid_structure("non-empty custom format", 0, s)),
+        "" => Err(invalid_format("empty format string", 0, s)),
         _ => parse_custom(s, fmt),
     }
 }
@@ -591,7 +599,11 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
     // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
     if fmt.chars().count() < 2 {
-        return Err(invalid_structure(fmt, 0, input));
+        return Err(invalid_format(
+            &format!("'{fmt}' is not a known format specifier"),
+            0,
+            input,
+        ));
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;
@@ -602,11 +614,19 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
         // (including ParseRepeatPattern) on the next character — it is a transparent
         // pass-through. '%' at end-of-format or '%%' are both errors.
         if ch == '%' {
-            ch = it
-                .next()
-                .ok_or_else(|| invalid_structure(fmt, offset_of(input, inp), input))?;
+            ch = it.next().ok_or_else(|| {
+                invalid_format(
+                    "'%' at end of format must be followed by a specifier",
+                    offset_of(input, inp),
+                    input,
+                )
+            })?;
             if ch == '%' {
-                return Err(invalid_structure(fmt, offset_of(input, inp), input));
+                return Err(invalid_format(
+                    "'%%' is not valid; '%' must be followed by a single specifier character",
+                    offset_of(input, inp),
+                    input,
+                ));
             }
         }
         match ch {
@@ -622,14 +642,22 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                     _ => 7,
                 };
                 if n > max {
-                    return Err(invalid_structure(fmt, offset_of(input, inp), input));
+                    return Err(invalid_format(
+                        &format!("'{ch}' repeated {n} times; maximum is {max}"),
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
                 apply_spec(ch, n, &mut inp, &mut b, input, fmt)?;
             }
             '\\' => {
-                let expected = it
-                    .next()
-                    .ok_or_else(|| invalid_structure(fmt, offset_of(input, inp), input))?;
+                let expected = it.next().ok_or_else(|| {
+                    invalid_format(
+                        "'\\' in format must be followed by a character",
+                        offset_of(input, inp),
+                        input,
+                    )
+                })?;
                 let got = inp
                     .chars()
                     .next()
@@ -646,9 +674,13 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                 // '\' inside a quoted literal escapes the next character.
                 while let Some(c) = it.next() {
                     if c == '\\' {
-                        let escaped = it
-                            .next()
-                            .ok_or_else(|| invalid_structure(fmt, offset_of(input, inp), input))?;
+                        let escaped = it.next().ok_or_else(|| {
+                            invalid_format(
+                                "'\\' in format must be followed by a character",
+                                offset_of(input, inp),
+                                input,
+                            )
+                        })?;
                         lit.push(escaped);
                     } else if c == q {
                         closed = true;
@@ -658,7 +690,11 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                     }
                 }
                 if !closed {
-                    return Err(invalid_structure(fmt, offset_of(input, inp), input));
+                    return Err(invalid_format(
+                        &format!("unclosed {q:?} in format string"),
+                        offset_of(input, inp),
+                        input,
+                    ));
                 }
                 if !inp.starts_with(lit.as_str()) {
                     return Err(invalid_structure(fmt, offset_of(input, inp), input));
@@ -666,7 +702,11 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                 inp = &inp[lit.len()..];
             }
             _ => {
-                return Err(invalid_structure(fmt, offset_of(input, inp), input));
+                return Err(invalid_format(
+                    &format!("unrecognised character {ch:?} in format string"),
+                    offset_of(input, inp),
+                    input,
+                ));
             }
         }
     }
@@ -688,7 +728,11 @@ fn apply_spec<'a>(
     macro_rules! dup {
         ($field:expr) => {
             if $field.is_some() {
-                return Err(invalid_structure(fmt, offset_of(original, inp), original));
+                return Err(invalid_format(
+                    &format!("duplicate '{ch}' specifier in format"),
+                    offset_of(original, inp),
+                    original,
+                ));
             }
         };
     }
