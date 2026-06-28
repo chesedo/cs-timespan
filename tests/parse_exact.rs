@@ -345,7 +345,7 @@ fn parse_exact_invalid_garbage() {
         TimeSpan::parse_exact("garbage", "c")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d.]hh:mm[:ss[.fffffff]]
   "garbage"
    ^"#,
     );
@@ -403,7 +403,7 @@ fn parse_exact_g_rejects_dot_separated_days() {
         TimeSpan::parse_exact("1.12:24:02", "g")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d:]h:mm[:ss[.FFFFFFF]]
   "1.12:24:02"
    ^"#,
     );
@@ -416,7 +416,7 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
         TimeSpan::parse_exact("1:12:24:02", "G")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-]d:hh:mm:ss.fffffff
   "1:12:24:02"
            ^"#,
     );
@@ -428,7 +428,7 @@ fn parse_exact_invalid_empty_format_string() {
         TimeSpan::parse_exact("00:00:00", "")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected non-empty custom format
   "00:00:00"
    ^"#,
     );
@@ -441,13 +441,13 @@ fn parse_exact_invalid_empty_format_string() {
 fn parse_exact_invalid_single_char_custom_format() {
     assert_eq!(
         TimeSpan::parse_exact("5", "d").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected d
   "5"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("5", "h").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected h
   "5"
    ^"#,
     );
@@ -459,7 +459,7 @@ fn parse_exact_invalid_unknown_format_specifier() {
         TimeSpan::parse_exact("12.5:2", "V")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected V
   "12.5:2"
    ^"#,
     );
@@ -469,13 +469,13 @@ fn parse_exact_invalid_unknown_format_specifier() {
 fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
         TimeSpan::parse_exact("1", r"d%").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected d%
   "1"
     ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("1", r"%%d").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected %%d
   "1"
    ^"#,
     );
@@ -487,7 +487,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hhh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hhh\:mm\:ss
   "12:34:56"
    ^"#,
     );
@@ -495,7 +495,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:hh\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:hh\:ss
   "12:34:56"
       ^"#,
     );
@@ -503,7 +503,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mm\:mm
   "12:34:56"
          ^"#,
     );
@@ -511,7 +511,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:ss\:ss
   "12:34:56"
          ^"#,
     );
@@ -524,7 +524,7 @@ fn parse_exact_invalid_wrong_digit_count() {
         TimeSpan::parse_exact("123:34:56", r"hh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mm\:ss
   "123:34:56"
      ^"#,
     );
@@ -532,7 +532,7 @@ fn parse_exact_invalid_wrong_digit_count() {
         TimeSpan::parse_exact("12:345:56", r"hh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mm\:ss
   "12:345:56"
         ^"#,
     );
@@ -540,7 +540,7 @@ fn parse_exact_invalid_wrong_digit_count() {
         TimeSpan::parse_exact("12:34:056", r"hh\:mm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mm\:ss
   "12:34:056"
            ^"#,
     );
@@ -552,7 +552,7 @@ fn parse_exact_invalid_triple_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mmm\:ss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mmm\:ss
   "12:34:56"
       ^"#,
     );
@@ -560,7 +560,7 @@ fn parse_exact_invalid_triple_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:sss")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected hh\:mm\:sss
   "12:34:56"
          ^"#,
     );
@@ -573,7 +573,7 @@ fn parse_exact_invalid_f_wrong_digit_count() {
         TimeSpan::parse_exact("678", "ffff")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected ffff
   "678"
    ^"#,
     );
@@ -585,7 +585,7 @@ fn parse_exact_invalid_f_uppercase_too_many_chars() {
         TimeSpan::parse_exact("00000012", "FFFFFFFF")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected FFFFFFFF
   "00000012"
    ^"#,
     );
@@ -598,7 +598,7 @@ fn parse_exact_invalid_d_too_many_specifiers() {
         TimeSpan::parse_exact("000000123", "ddddddddd")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected ddddddddd
   "000000123"
    ^"#,
     );
@@ -610,7 +610,7 @@ fn parse_exact_invalid_duplicate_d_specifier() {
         TimeSpan::parse_exact("12:34:56", r"dd:dd:hh")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected dd:dd:hh
   "12:34:56"
      ^"#,
     );
@@ -622,7 +622,7 @@ fn parse_exact_invalid_too_many_digits_for_dd() {
         TimeSpan::parse_exact("123:45", r"dd:hh")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected dd:hh
   "123:45"
      ^"#,
     );
@@ -634,7 +634,7 @@ fn parse_exact_invalid_unknown_specifier_vv() {
         TimeSpan::parse_exact("12:34", r"dd:vv")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected dd:vv
   "12:34"
      ^"#,
     );
@@ -646,7 +646,7 @@ fn parse_exact_invalid_ff_repeated() {
         TimeSpan::parse_exact("12:45", "ff:ff")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected ff:ff
   "12:45"
      ^"#,
     );
@@ -658,7 +658,7 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
         TimeSpan::parse_exact("12:34 minutes", r#"mm\:ss\ "minutes"#)
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected mm\:ss\ "minutes
   "12:34 minutes"
          ^"#,
     );
@@ -670,7 +670,7 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
         TimeSpan::parse_exact("12:34 minutes", r"mm\:ss\ 'minutes")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected mm\:ss\ 'minutes
   "12:34 minutes"
          ^"#,
     );
@@ -682,7 +682,7 @@ fn parse_exact_invalid_literal_mismatch() {
         TimeSpan::parse_exact("12:34 mints", r#"mm\:ss\ "minutes""#)
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected mm\:ss\ "minutes"
   "12:34 mints"
          ^"#,
     );
@@ -690,7 +690,7 @@ fn parse_exact_invalid_literal_mismatch() {
         TimeSpan::parse_exact("12:34 mints", r"mm\:ss\ 'minutes'")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected mm\:ss\ 'minutes'
   "12:34 mints"
          ^"#,
     );

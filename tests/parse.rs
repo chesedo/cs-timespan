@@ -308,7 +308,7 @@ fn parse_invalid_date_like_string() {
 fn parse_invalid_trailing_colon() {
     assert_eq!(
         TimeSpan::parse("00:").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:"
       ^"#,
     );
@@ -344,7 +344,7 @@ fn parse_invalid_embedded_null_chars() {
 fn parse_invalid_double_colon() {
     assert_eq!(
         TimeSpan::parse("00:00::00").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:00::00"
          ^"#,
     );
@@ -354,7 +354,7 @@ fn parse_invalid_double_colon() {
 fn parse_invalid_trailing_colon_after_seconds() {
     assert_eq!(
         TimeSpan::parse("00:00:00:").unwrap_err().to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:00:00:"
             ^"#,
     );
@@ -366,7 +366,7 @@ fn parse_invalid_too_many_components() {
         TimeSpan::parse("00:00:00:00:00:00:00:00")
             .unwrap_err()
             .to_string(),
-        r#"input has an unrecognised component structure
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:00:00:00:00:00:00:00"
    ^"#,
     );

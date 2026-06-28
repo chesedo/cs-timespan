@@ -143,7 +143,7 @@ impl TimeSpan {
         formats: &[&str],
         locale: Locale,
     ) -> Result<Self, ParseError> {
-        let mut last = ParseError::new(ParseErrorKind::InvalidStructure, 0, s);
+        let mut last = ParseError::new(ParseErrorKind::InvalidStructure("".into()), 0, s);
         for fmt in formats {
             match Self::parse_exact_with_culture(s, fmt, locale) {
                 Ok(ts) => return Ok(ts),
