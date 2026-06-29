@@ -3,7 +3,7 @@ pub use num_format::Locale;
 mod fmt;
 mod parse;
 pub use fmt::{FormatError, FormatErrorKind};
-pub use parse::{ParseError, ParseErrorKind, TimeSpanStyles};
+pub use parse::{OverflowKind, ParseError, ParseErrorKind, TimeSpanStyles};
 
 /// A C# `System.TimeSpan`-compatible time interval type for Rust.
 ///
@@ -95,7 +95,7 @@ impl TimeSpan {
     ///
     /// // Bad syntax or out-of-range value produce descriptive errors
     /// assert!(TimeSpan::parse("garbage").unwrap_err().to_string().contains("expected a digit"));
-    /// assert!(TimeSpan::parse("00:00:60").unwrap_err().to_string().contains("outside the representable range"));
+    /// assert!(TimeSpan::parse("00:00:60").unwrap_err().to_string().contains("out of range"));
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         Self::parse_with_culture(s, Locale::en)

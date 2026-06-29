@@ -1,5 +1,18 @@
 use crate::TimeSpan;
 
+/// Why an [`ParseErrorKind::Overflow`] error was triggered.
+#[derive(Debug, Clone)]
+pub enum OverflowKind {
+    /// Hours component was ≥ 24; carries the out-of-range value.
+    Hours(u32),
+    /// Minutes component was ≥ 60; carries the out-of-range value.
+    Minutes(u32),
+    /// Seconds component was ≥ 60; carries the out-of-range value.
+    Seconds(u32),
+    /// Total tick value exceeds [`TimeSpan::MAX_VALUE`] or is below [`TimeSpan::MIN_VALUE`].
+    Value,
+}
+
 /// The category of error returned when a time-span string fails to parse.
 ///
 /// Mirrors the two distinct failure modes C# separates into
@@ -24,7 +37,7 @@ pub enum ParseErrorKind {
     InvalidFormat(Box<str>),
     /// The value is syntactically valid but outside the representable range
     /// (`OverflowException`).
-    Overflow,
+    Overflow(OverflowKind),
 }
 
 // Compare by variant only — the expected-description payload is informational.
@@ -80,9 +93,20 @@ impl std::fmt::Display for ParseError {
                 writeln!(f, "unrecognised input structure; expected {expected}")?
             }
             ParseErrorKind::InvalidFormat(desc) => writeln!(f, "invalid custom format: {desc}")?,
-            ParseErrorKind::Overflow => {
-                writeln!(f, "TimeSpan value is outside the representable range")?
-            }
+            ParseErrorKind::Overflow(reason) => match reason {
+                OverflowKind::Hours(h) => {
+                    writeln!(f, "hours value {h} is out of range; must be 0\u{2013}23")?
+                }
+                OverflowKind::Minutes(m) => {
+                    writeln!(f, "minutes value {m} is out of range; must be 0\u{2013}59")?
+                }
+                OverflowKind::Seconds(s) => {
+                    writeln!(f, "seconds value {s} is out of range; must be 0\u{2013}59")?
+                }
+                OverflowKind::Value => {
+                    writeln!(f, "TimeSpan value is outside the representable range")?
+                }
+            },
         }
         writeln!(f, "  \"{}\"", self.input)?;
         write!(f, "   {}^", " ".repeat(self.pos))
@@ -139,27 +163,15 @@ impl<'a> Builder<'a> {
         let frac = parse_component_frac(self.frac, self.original)?;
         if h >= 24 {
             let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
-            return Err(ParseError::new(
-                ParseErrorKind::Overflow,
-                pos,
-                self.original,
-            ));
+            return Err(overflow(OverflowKind::Hours(h), pos, self.original));
         }
         if m >= 60 {
             let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
-            return Err(ParseError::new(
-                ParseErrorKind::Overflow,
-                pos,
-                self.original,
-            ));
+            return Err(overflow(OverflowKind::Minutes(m), pos, self.original));
         }
         if sv >= 60 {
             let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
-            return Err(ParseError::new(
-                ParseErrorKind::Overflow,
-                pos,
-                self.original,
-            ));
+            return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
         }
         build_ticks(self.neg, days, h, m, sv, frac, self.original)
     }
@@ -192,7 +204,7 @@ fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
         ));
     }
     s.parse::<u64>()
-        .map_err(|_| ParseError::new(ParseErrorKind::Overflow, base, original))
+        .map_err(|_| overflow(OverflowKind::Value, base, original))
 }
 
 fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
@@ -217,7 +229,7 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
     // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
     let zeroes = s.bytes().take_while(|&b| b == b'0').count();
     if zeroes == 0 {
-        return Err(ParseError::new(ParseErrorKind::Overflow, base, original));
+        return Err(overflow(OverflowKind::Value, base, original));
     }
     if zeroes > 7 {
         return Ok(0);
@@ -245,25 +257,25 @@ fn build_ticks(
     frac: u32,
     original: &str,
 ) -> Result<TimeSpan, ParseError> {
-    let overflow = || ParseError::new(ParseErrorKind::Overflow, 0, original);
+    let ovf = || overflow(OverflowKind::Value, 0, original);
     let ticks = (days as u128)
         .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
         .and_then(|t| t.checked_add(h as u128 * TimeSpan::TICKS_PER_HOUR as u128))
         .and_then(|t| t.checked_add(m as u128 * TimeSpan::TICKS_PER_MINUTE as u128))
         .and_then(|t| t.checked_add(s as u128 * TimeSpan::TICKS_PER_SECOND as u128))
         .and_then(|t| t.checked_add(frac as u128))
-        .ok_or_else(overflow)?;
+        .ok_or_else(ovf)?;
     if neg {
         const ABS_MIN: u128 = (i64::MAX as u128) + 1;
         if ticks > ABS_MIN {
-            return Err(overflow());
+            return Err(ovf());
         } else if ticks == ABS_MIN {
             return Ok(TimeSpan::from_ticks(i64::MIN));
         }
         Ok(TimeSpan::from_ticks(-(ticks as i64)))
     } else {
         if ticks > i64::MAX as u128 {
-            return Err(overflow());
+            return Err(ovf());
         }
         Ok(TimeSpan::from_ticks(ticks as i64))
     }
@@ -286,6 +298,10 @@ fn invalid_structure(expected: &str, pos: usize, input: &str) -> ParseError {
 
 fn invalid_format(desc: &str, fmt: &str, fmt_pos: usize) -> ParseError {
     ParseError::new(ParseErrorKind::InvalidFormat(desc.into()), fmt_pos, fmt)
+}
+
+fn overflow(kind: OverflowKind, pos: usize, input: &str) -> ParseError {
+    ParseError::new(ParseErrorKind::Overflow(kind), pos, input)
 }
 
 // ── Lenient parser (parse / parse_with_culture) ───────────────────────────────
