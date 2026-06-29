@@ -3,7 +3,7 @@
 > **This crate exists for one reason: exact compatibility with C#'s `System.TimeSpan`.**
 >
 > - **Just doing arithmetic with durations?** Use [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html).
-> - **Need human-readable duration strings (not C# format)?** Use [`humantime`](https://docs.rs/humantime) (`"1h 30m"`) or [`jiff`](https://docs.rs/jiff) (ISO 8601 `PT1H30M`).
+> - **Need to parse or format human-readable duration strings (not C# format)?** Use [`humantime`](https://docs.rs/humantime) (`"1h 30m"`) or [`jiff`](https://docs.rs/jiff) (ISO 8601 `PT1H30M`).
 > - **Migrating C# code or exchanging data with a .NET system?** This crate is for you — it parses and formats `System.TimeSpan` strings exactly as .NET does.
 
 Internally stores a signed tick count where **1 tick = 100 nanoseconds**, identical to the C# representation.
