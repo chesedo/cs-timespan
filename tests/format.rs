@@ -37,7 +37,7 @@ fn dhmsm(d: i64, h: i64, m: i64, s: i64, ms: i64) -> TimeSpan {
 }
 
 fn neg(t: TimeSpan) -> TimeSpan {
-    TimeSpan::from_ticks(-t.ticks())
+    -t
 }
 
 // The large value used as the primary formatting test input throughout the C# suite.
@@ -547,8 +547,8 @@ fn format_custom_trailing_escape() {
 fn doc_standard_c_format_arithmetic() {
     let interval1 = hms(7, 45, 16);
     let interval2 = hms(18, 12, 38);
-    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let diff = interval1 - interval2;
+    let sum = interval1 + interval2;
     assert_eq!(interval1.to_string_fmt("c").unwrap(), "07:45:16");
     assert_eq!(interval2.to_string_fmt("c").unwrap(), "18:12:38");
     assert_eq!(diff.to_string_fmt("c").unwrap(), "-10:27:22");
@@ -561,7 +561,7 @@ fn doc_standard_c_format_arithmetic() {
 fn doc_standard_c_format_from_ticks() {
     let interval1 = dhmsm(0, 0, 1, 14, 365);
     let interval2 = TimeSpan::from_ticks(2143756);
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let sum = interval1 + interval2;
     assert_eq!(interval1.to_string_fmt("c").unwrap(), "00:01:14.3650000");
     assert_eq!(interval2.to_string_fmt("c").unwrap(), "00:00:00.2143756");
     assert_eq!(sum.to_string_fmt("c").unwrap(), "00:01:14.5793756");
@@ -575,8 +575,8 @@ fn doc_standard_c_format_from_ticks() {
 fn doc_standard_g_format_arithmetic() {
     let interval1 = hms(7, 45, 16);
     let interval2 = hms(18, 12, 38);
-    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let diff = interval1 - interval2;
+    let sum = interval1 + interval2;
     assert_eq!(
         interval1
             .to_string_fmt_with_culture("g", Locale::en)
@@ -599,7 +599,7 @@ fn doc_standard_g_format_fractional() {
     // TimeSpan.FromTicks(2143756)
     let interval1 = dhmsm(0, 0, 1, 14, 36);
     let interval2 = TimeSpan::from_ticks(2143756);
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let sum = interval1 + interval2;
     assert_eq!(
         interval1
             .to_string_fmt_with_culture("g", Locale::en)
@@ -625,8 +625,8 @@ fn doc_standard_g_format_fractional() {
 fn doc_standard_g_upper_format_arithmetic() {
     let interval1 = hms(7, 45, 16);
     let interval2 = hms(18, 12, 38);
-    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let diff = interval1 - interval2;
+    let sum = interval1 + interval2;
     assert_eq!(
         interval1
             .to_string_fmt_with_culture("G", Locale::en)
@@ -654,7 +654,7 @@ fn doc_standard_g_upper_format_fractional() {
     // new TimeSpan(0, 0, 1, 14, 36) and FromTicks(2143756)
     let interval1 = dhmsm(0, 0, 1, 14, 36);
     let interval2 = TimeSpan::from_ticks(2143756);
-    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    let sum = interval1 + interval2;
     assert_eq!(
         interval1
             .to_string_fmt_with_culture("G", Locale::en)
@@ -714,7 +714,7 @@ fn doc_custom_hh_format_d_dot_hh_colon_mm_colon_ss() {
 fn doc_custom_mm_format_travel_time() {
     let depart = hms(11, 12, 0);
     let arrive = hms(16, 28, 0);
-    let elapsed = TimeSpan::from_ticks(arrive.ticks() - depart.ticks());
+    let elapsed = arrive - depart;
     assert_eq!(elapsed.to_string_fmt(r"hh\:mm").unwrap(), "05:16");
 }
 

@@ -37,7 +37,7 @@ fn ts5(d: i64, h: i64, m: i64, s: i64, ms: i64) -> TimeSpan {
 }
 
 fn neg(t: TimeSpan) -> TimeSpan {
-    TimeSpan::from_ticks(-t.ticks())
+    -t
 }
 
 // ── ParseExact_Valid — constant format "c" / "t" / "T" ───────────────────────

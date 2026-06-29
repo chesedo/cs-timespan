@@ -379,3 +379,78 @@ impl TryFrom<TimeSpan> for std::time::Duration {
         Ok(std::time::Duration::new(secs, subsec_nanos))
     }
 }
+
+// ── Arithmetic ────────────────────────────────────────────────────────────────
+
+impl std::ops::Add for TimeSpan {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self::from_ticks(self.ticks + rhs.ticks)
+    }
+}
+
+impl std::ops::Sub for TimeSpan {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self::from_ticks(self.ticks - rhs.ticks)
+    }
+}
+
+impl std::ops::Neg for TimeSpan {
+    type Output = Self;
+    fn neg(self) -> Self {
+        Self::from_ticks(-self.ticks)
+    }
+}
+
+impl std::ops::AddAssign for TimeSpan {
+    fn add_assign(&mut self, rhs: Self) {
+        self.ticks += rhs.ticks;
+    }
+}
+
+impl std::ops::SubAssign for TimeSpan {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.ticks -= rhs.ticks;
+    }
+}
+
+impl std::ops::Mul<i64> for TimeSpan {
+    type Output = Self;
+    fn mul(self, rhs: i64) -> Self {
+        Self::from_ticks(self.ticks * rhs)
+    }
+}
+
+impl std::ops::Mul<TimeSpan> for i64 {
+    type Output = TimeSpan;
+    fn mul(self, rhs: TimeSpan) -> TimeSpan {
+        TimeSpan::from_ticks(self * rhs.ticks)
+    }
+}
+
+impl std::ops::MulAssign<i64> for TimeSpan {
+    fn mul_assign(&mut self, rhs: i64) {
+        self.ticks *= rhs;
+    }
+}
+
+impl std::ops::Div<i64> for TimeSpan {
+    type Output = Self;
+    fn div(self, rhs: i64) -> Self {
+        Self::from_ticks(self.ticks / rhs)
+    }
+}
+
+impl std::ops::DivAssign<i64> for TimeSpan {
+    fn div_assign(&mut self, rhs: i64) {
+        self.ticks /= rhs;
+    }
+}
+
+impl std::ops::Div<TimeSpan> for TimeSpan {
+    type Output = f64;
+    fn div(self, rhs: TimeSpan) -> f64 {
+        self.ticks as f64 / rhs.ticks as f64
+    }
+}
