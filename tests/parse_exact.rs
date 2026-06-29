@@ -507,6 +507,22 @@ fn parse_exact_invalid_repeated_specifier() {
   "hh\:ss\:ss"
            ^"#,
     );
+    assert_eq!(
+        TimeSpan::parse_exact("12:34:56", r"dd\:dd\:hh")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: duplicate 'dd' specifier in format
+  "dd\:dd\:hh"
+       ^"#,
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("12:45", r"ff\:ff")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: duplicate 'ff' specifier in format
+  "ff\:ff"
+       ^"#,
+    );
 }
 
 #[test]
@@ -605,18 +621,6 @@ fn parse_exact_invalid_d_too_many_specifiers() {
 }
 
 #[test]
-fn parse_exact_invalid_duplicate_d_specifier() {
-    assert_eq!(
-        TimeSpan::parse_exact("12:34:56", r"dd\:dd\:hh")
-            .unwrap_err()
-            .to_string(),
-        r#"invalid custom format: duplicate 'dd' specifier in format
-  "dd\:dd\:hh"
-       ^"#,
-    );
-}
-
-#[test]
 fn parse_exact_invalid_duplicate_percent_h_specifier() {
     assert_eq!(
         TimeSpan::parse_exact("12:34", r"%h\:%h")
@@ -670,17 +674,6 @@ fn parse_exact_invalid_unknown_specifier_vv() {
     );
 }
 
-#[test]
-fn parse_exact_invalid_ff_repeated() {
-    assert_eq!(
-        TimeSpan::parse_exact("12:45", r"ff\:ff")
-            .unwrap_err()
-            .to_string(),
-        r#"invalid custom format: duplicate 'ff' specifier in format
-  "ff\:ff"
-       ^"#,
-    );
-}
 
 #[test]
 fn parse_exact_invalid_unclosed_literal_double_quote() {
