@@ -1,8 +1,12 @@
 # cs-timespan
 
-A Rust implementation of C#'s `System.TimeSpan`, for working with serialized C# time intervals.
+> **This crate exists for one reason: exact compatibility with C#'s `System.TimeSpan`.**
+>
+> If you just need to work with time durations in Rust, use [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html) instead — they are better-integrated with the Rust ecosystem.
+>
+> This crate is the right choice when you are **migrating C# code to Rust** and need to parse or format time intervals in exactly the way .NET does, or when you are exchanging data with a C# system that serializes `System.TimeSpan` values.
 
-Internally stores a signed tick count where **1 tick = 100 nanoseconds**, identical to the C# representation. If you are migrating code from C# to Rust and need to parse or format time intervals exactly as .NET does, this crate is for you.
+Internally stores a signed tick count where **1 tick = 100 nanoseconds**, identical to the C# representation.
 
 ## Usage
 
