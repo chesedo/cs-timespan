@@ -2,9 +2,9 @@
 
 > **This crate exists for one reason: exact compatibility with C#'s `System.TimeSpan`.**
 >
-> If you just need to work with time durations in Rust, use [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html) instead — they are better-integrated with the Rust ecosystem.
->
-> This crate is the right choice when you are **migrating C# code to Rust** and need to parse or format time intervals in exactly the way .NET does, or when you are exchanging data with a C# system that serializes `System.TimeSpan` values.
+> - **Just doing arithmetic with durations?** Use [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html).
+> - **Need human-readable duration strings (not C# format)?** Use [`humantime`](https://docs.rs/humantime) (`"1h 30m"`) or [`jiff`](https://docs.rs/jiff) (ISO 8601 `PT1H30M`).
+> - **Migrating C# code or exchanging data with a .NET system?** This crate is for you — it parses and formats `System.TimeSpan` strings exactly as .NET does.
 
 Internally stores a signed tick count where **1 tick = 100 nanoseconds**, identical to the C# representation.
 
