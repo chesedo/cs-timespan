@@ -668,12 +668,11 @@ fn parse_exact_invalid_unknown_specifier_vv() {
         TimeSpan::parse_exact("12:34", r"dd\:vv")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: unrecognised character 'v' in format string
+        r#"invalid custom format: unrecognised character 'v' in format string; valid specifiers: d, h, m, s, f, F — use '\v' to include it as a literal
   "dd\:vv"
        ^"#,
     );
 }
-
 
 #[test]
 fn parse_exact_invalid_unclosed_literal_double_quote() {

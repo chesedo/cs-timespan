@@ -729,7 +729,9 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
             }
             _ => {
                 return Err(invalid_format(
-                    &format!("unrecognised character {ch:?} in format string"),
+                    &format!(
+                        "unrecognised character {ch:?} in format string; valid specifiers: d, h, m, s, f, F \u{2014} use '\\{ch}' to include it as a literal"
+                    ),
                     fmt,
                     ch_start,
                 ));
