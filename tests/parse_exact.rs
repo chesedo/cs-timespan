@@ -626,6 +626,24 @@ fn parse_exact_invalid_duplicate_percent_h_specifier() {
   "%h\:%h"
        ^"#,
     );
+    // Mixed: hh then %h — second (%h) is named in the error
+    assert_eq!(
+        TimeSpan::parse_exact("12:34", r"hh\:%h")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: duplicate '%h' specifier in format
+  "hh\:%h"
+       ^"#,
+    );
+    // Mixed: %h then hh — second (hh) is named in the error
+    assert_eq!(
+        TimeSpan::parse_exact("12:34", r"%h\:hh")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: duplicate 'hh' specifier in format
+  "%h\:hh"
+       ^"#,
+    );
 }
 
 #[test]
