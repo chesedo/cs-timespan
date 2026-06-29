@@ -1,3 +1,72 @@
+//! A Rust implementation of C#'s [`System.TimeSpan`], for working with
+//! serialized C# time intervals.
+//!
+//! Internally stores a signed tick count where 1 tick = 100 nanoseconds,
+//! identical to the C# representation.
+//!
+//! # Parsing
+//!
+//! [`TimeSpan::parse`] is lenient (mirrors `TimeSpan.Parse`);
+//! [`TimeSpan::parse_exact`] requires an exact format match (mirrors
+//! `TimeSpan.ParseExact`):
+//!
+//! ```
+//! use cs_timespan::TimeSpan;
+//!
+//! let ts = TimeSpan::parse("1.02:03:04.5678900").unwrap();
+//! assert_eq!(ts.ticks(), 937_845_678_900);
+//!
+//! let ts2 = TimeSpan::parse_exact("1.02:03:04.5678900", "c").unwrap();
+//! assert_eq!(ts, ts2);
+//! ```
+//!
+//! # Formatting
+//!
+//! [`Display`][std::fmt::Display] uses the constant `"c"` format.
+//! [`TimeSpan::to_string_fmt`] accepts any standard or custom format string:
+//!
+//! ```
+//! use cs_timespan::TimeSpan;
+//!
+//! let ts = TimeSpan::from_ticks(937_845_678_900);
+//! assert_eq!(ts.to_string(),               "1.02:03:04.5678900");
+//! assert_eq!(ts.to_string_fmt("g").unwrap(), "1:2:03:04.56789");
+//! ```
+//!
+//! # Format strings
+//!
+//! This crate supports the same standard and custom format specifiers as C#.
+//! Refer to the Microsoft documentation for the full reference:
+//!
+//! - [Standard TimeSpan format strings] — `"c"`, `"g"`, `"G"`
+//! - [Custom TimeSpan format strings] — `d`, `h`, `m`, `s`, `f`/`F`, `%x`, `\x`
+//!
+//! # Locale support
+//!
+//! Methods with a `_with_culture` suffix accept a [`Locale`] to control the
+//! decimal separator used in fractional seconds. The default (invariant) culture
+//! uses `.`:
+//!
+//! ```
+//! use cs_timespan::{TimeSpan, Locale};
+//!
+//! // Croatian locale uses ',' as the decimal separator
+//! let ts = TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr).unwrap();
+//! assert_eq!(ts, TimeSpan::parse_with_culture("6:12:14:45.348", Locale::en).unwrap());
+//! ```
+//!
+//! # Conversions
+//!
+//! [`TimeSpan`] converts to and from [`std::time::Duration`]. Negative values
+//! cannot be represented as `Duration`; that direction returns [`NegativeTimeSpan`].
+//!
+//! With the optional `chrono` feature, conversions to and from
+//! [`chrono::TimeDelta`] are also available.
+//!
+//! [`System.TimeSpan`]: https://learn.microsoft.com/en-us/dotnet/api/system.timespan
+//! [Standard TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
+//! [Custom TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
+
 pub use num_format::Locale;
 
 mod fmt;
@@ -122,14 +191,41 @@ impl TimeSpan {
     }
 
     // ── Strict parsing (mirrors ParseExact / TryParseExact) ───────────────────
+    /// Parses a time interval string using a specific format, with the invariant
+    /// culture (`.` decimal separator).
+    ///
+    /// Mirrors [`TimeSpan.ParseExact`]. For supported format strings see
+    /// [Standard TimeSpan format strings] and [Custom TimeSpan format strings].
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(
+    ///     TimeSpan::parse_exact("1.02:03:04", "c").unwrap().ticks(),
+    ///     937_840_000_000,
+    /// );
+    /// assert_eq!(
+    ///     TimeSpan::parse_exact("12.05:02:03", r"d\.hh\:mm\:ss").unwrap().ticks(),
+    ///     TimeSpan::parse("12.05:02:03").unwrap().ticks(),
+    /// );
+    /// ```
+    ///
+    /// [`TimeSpan.ParseExact`]: https://learn.microsoft.com/en-us/dotnet/api/system.timespan.parseexact
+    /// [Standard TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
+    /// [Custom TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
     pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
         Self::parse_exact_with_culture(s, fmt, Locale::en)
     }
 
+    /// Tries each format string in order and returns the first successful parse,
+    /// using the invariant culture.
+    ///
+    /// Mirrors `TimeSpan.ParseExact` with an array of formats.
     pub fn parse_exact_any(s: &str, formats: &[&str]) -> Result<Self, ParseError> {
         Self::parse_exact_any_with_culture(s, formats, Locale::en)
     }
 
+    /// Parses using a specific format and locale decimal separator.
     pub fn parse_exact_with_culture(
         s: &str,
         fmt: &str,
@@ -138,6 +234,8 @@ impl TimeSpan {
         parse::parse_exact(s, fmt, decimal_sep(locale))
     }
 
+    /// Tries each format string in order and returns the first successful parse,
+    /// using the given locale decimal separator.
     pub fn parse_exact_any_with_culture(
         s: &str,
         formats: &[&str],
@@ -153,6 +251,10 @@ impl TimeSpan {
         Err(last)
     }
 
+    /// Parses using a specific format, locale, and [`TimeSpanStyles`].
+    ///
+    /// [`TimeSpanStyles::AssumeNegative`] negates a positive result, mirroring
+    /// the C# overload that accepts `TimeSpanStyles`.
     pub fn parse_exact_with_styles(
         s: &str,
         fmt: &str,
