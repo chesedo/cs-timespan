@@ -599,11 +599,16 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
     // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
     if fmt.chars().count() < 2 {
-        return Err(invalid_format(
-            &format!("'{fmt}' is not a known format specifier"),
-            fmt,
-            0,
-        ));
+        const VALID: &str = "valid specifiers: d, h, m, s, f, F";
+        let msg = match fmt {
+            "d" | "h" | "m" | "s" | "f" | "F" => {
+                format!(
+                    "'{fmt}' must be prefixed with '%' when used alone (e.g. '%{fmt}'); {VALID}"
+                )
+            }
+            _ => format!("'{fmt}' is not a known format specifier; {VALID}"),
+        };
+        return Err(invalid_format(&msg, fmt, 0));
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;

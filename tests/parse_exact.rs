@@ -441,13 +441,13 @@ fn parse_exact_invalid_empty_format_string() {
 fn parse_exact_invalid_single_char_custom_format() {
     assert_eq!(
         TimeSpan::parse_exact("5", "d").unwrap_err().to_string(),
-        r#"invalid custom format: 'd' is not a known format specifier
+        r#"invalid custom format: 'd' must be prefixed with '%' when used alone (e.g. '%d'); valid specifiers: d, h, m, s, f, F
   "d"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("5", "h").unwrap_err().to_string(),
-        r#"invalid custom format: 'h' is not a known format specifier
+        r#"invalid custom format: 'h' must be prefixed with '%' when used alone (e.g. '%h'); valid specifiers: d, h, m, s, f, F
   "h"
    ^"#,
     );
@@ -459,7 +459,7 @@ fn parse_exact_invalid_unknown_format_specifier() {
         TimeSpan::parse_exact("12.5:2", "V")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: 'V' is not a known format specifier
+        r#"invalid custom format: 'V' is not a known format specifier; valid specifiers: d, h, m, s, f, F
   "V"
    ^"#,
     );
