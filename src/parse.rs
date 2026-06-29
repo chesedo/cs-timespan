@@ -95,13 +95,13 @@ impl std::fmt::Display for ParseError {
             ParseErrorKind::InvalidFormat(desc) => writeln!(f, "invalid custom format: {desc}")?,
             ParseErrorKind::Overflow(reason) => match reason {
                 OverflowKind::Hours(h) => {
-                    writeln!(f, "hours value {h} is out of range; must be 0\u{2013}23")?
+                    writeln!(f, "hours value {h} is out of range; must be 0-23")?
                 }
                 OverflowKind::Minutes(m) => {
-                    writeln!(f, "minutes value {m} is out of range; must be 0\u{2013}59")?
+                    writeln!(f, "minutes value {m} is out of range; must be 0-59")?
                 }
                 OverflowKind::Seconds(s) => {
-                    writeln!(f, "seconds value {s} is out of range; must be 0\u{2013}59")?
+                    writeln!(f, "seconds value {s} is out of range; must be 0-59")?
                 }
                 OverflowKind::Value => {
                     writeln!(f, "TimeSpan value is outside the representable range")?

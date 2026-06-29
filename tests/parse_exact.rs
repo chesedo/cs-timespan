@@ -778,7 +778,7 @@ fn parse_exact_overflow_hours_out_of_range() {
         TimeSpan::parse_exact("24:24:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"hours value 24 is out of range; must be 0–23
+        r#"hours value 24 is out of range; must be 0-23
   "24:24:02"
    ^"#,
     );
@@ -790,7 +790,7 @@ fn parse_exact_overflow_minutes_out_of_range() {
         TimeSpan::parse_exact("1:60:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"minutes value 60 is out of range; must be 0–59
+        r#"minutes value 60 is out of range; must be 0-59
   "1:60:02"
      ^"#,
     );
@@ -798,7 +798,7 @@ fn parse_exact_overflow_minutes_out_of_range() {
         TimeSpan::parse_exact("1.2:60:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"minutes value 60 is out of range; must be 0–59
+        r#"minutes value 60 is out of range; must be 0-59
   "1.2:60:02"
        ^"#,
     );
@@ -806,7 +806,7 @@ fn parse_exact_overflow_minutes_out_of_range() {
         TimeSpan::parse_exact("12:61:02", "g")
             .unwrap_err()
             .to_string(),
-        r#"minutes value 61 is out of range; must be 0–59
+        r#"minutes value 61 is out of range; must be 0-59
   "12:61:02"
       ^"#,
     );
@@ -818,7 +818,7 @@ fn parse_exact_overflow_seconds_out_of_range() {
         TimeSpan::parse_exact("1:59:60", "c")
             .unwrap_err()
             .to_string(),
-        r#"seconds value 60 is out of range; must be 0–59
+        r#"seconds value 60 is out of range; must be 0-59
   "1:59:60"
         ^"#,
     );
@@ -826,12 +826,12 @@ fn parse_exact_overflow_seconds_out_of_range() {
 
 #[test]
 fn parse_exact_overflow_hours_exceed_23_in_c_format() {
-    // "c" format hours must be 0–23; 24 hours overflows
+    // "c" format hours must be 0-23; 24 hours overflows
     assert_eq!(
         TimeSpan::parse_exact("1.24:59:02", "c")
             .unwrap_err()
             .to_string(),
-        r#"hours value 24 is out of range; must be 0–23
+        r#"hours value 24 is out of range; must be 0-23
   "1.24:59:02"
      ^"#,
     );
@@ -856,7 +856,7 @@ fn parse_exact_overflow_custom_format() {
         TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s")
             .unwrap_err()
             .to_string(),
-        r#"hours value 35 is out of range; must be 0–23
+        r#"hours value 35 is out of range; must be 0-23
   "12.35:32:43"
       ^"#,
     );

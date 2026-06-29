@@ -496,13 +496,13 @@ fn parse_overflow_exceeds_max_value() {
 fn parse_overflow_seconds_or_minutes_out_of_range() {
     assert_eq!(
         TimeSpan::parse("00:00:60").unwrap_err().to_string(),
-        r#"seconds value 60 is out of range; must be 0–59
+        r#"seconds value 60 is out of range; must be 0-59
   "00:00:60"
          ^"#,
     );
     assert_eq!(
         TimeSpan::parse("00:60:00").unwrap_err().to_string(),
-        r#"minutes value 60 is out of range; must be 0–59
+        r#"minutes value 60 is out of range; must be 0-59
   "00:60:00"
       ^"#,
     );
@@ -513,7 +513,7 @@ fn parse_overflow_ambiguous_hour_colon() {
     // "24:00" is ambiguous — treated as hours exceeding max per-component range
     assert_eq!(
         TimeSpan::parse("24:00").unwrap_err().to_string(),
-        r#"hours value 24 is out of range; must be 0–23
+        r#"hours value 24 is out of range; must be 0-23
   "24:00"
    ^"#,
     );
