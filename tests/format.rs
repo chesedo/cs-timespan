@@ -902,3 +902,46 @@ fn doc_custom_f_format_ticks_1003498765432() {
     assert_eq!(ts.to_string_fmt(r"s\.ffffff").unwrap(), "29.876543");
     assert_eq!(ts.to_string_fmt(r"s\.fffffff").unwrap(), "29.8765432");
 }
+
+// ── Coverage gaps identified by C# docs agent ────────────────────────────────
+//
+// These cases appeared in the Microsoft documentation examples but were not
+// yet present in the test suite.
+// Ref: https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
+
+#[test]
+fn format_custom_percent_d_zero() {
+    // C# docs: new TimeSpan(0,0,0,0,0).ToString("%d") → "0"
+    assert_eq!(TimeSpan::ZERO.to_string_fmt("%d").unwrap(), "0");
+}
+
+#[test]
+fn format_custom_negative_drops_sign() {
+    // Custom format strings have no sign specifier — negative TimeSpans output
+    // the absolute component values. C# docs: (-TimeSpan.FromHours(1)).ToString(@"hh\:mm\:ss")
+    // → "01:00:00" (no minus sign).
+    assert_eq!(
+        (-hms(1, 0, 0)).to_string_fmt(r"hh\:mm\:ss").unwrap(),
+        "01:00:00",
+    );
+}
+
+#[test]
+fn format_g_one_millisecond() {
+    // C# docs: new TimeSpan(0,0,0,0,1).ToString("g") → "0:00:00.001"
+    // (milliseconds in the short general format)
+    assert_eq!(
+        dhmsm(0, 0, 0, 0, 1).to_string_fmt("g").unwrap(),
+        "0:00:00.001"
+    );
+}
+
+#[test]
+fn format_g_upper_whole_day() {
+    // C# docs: new TimeSpan(1,0,0,0,0).ToString("G") → "1:00:00:00.0000000"
+    // (long general format always emits all 7 fraction digits)
+    assert_eq!(
+        dhms(1, 0, 0, 0).to_string_fmt("G").unwrap(),
+        "1:00:00:00.0000000"
+    );
+}

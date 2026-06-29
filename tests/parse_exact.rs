@@ -752,16 +752,43 @@ fn parse_exact_with_styles_assume_negative_custom_format() {
     );
 }
 
+// C# TimeSpanParse.cs `TryParseExactTimeSpan` (lines ~1228–1246 in dotnet/runtime):
+// The five standard format characters ('c'/'t'/'T'/'g'/'G') are dispatched directly
+// without forwarding `styles` to the parser — `AssumeNegative` is therefore invisible
+// to them. Only `TryParseByFormat` (custom formats) receives and acts on `styles`.
 #[test]
 fn parse_exact_with_styles_assume_negative_standard_format() {
+    // AssumeNegative is silently ignored for all five standard format strings; the
+    // sign comes from the input alone.
+    for fmt in ["c", "t", "T"] {
+        assert_eq!(
+            TimeSpan::parse_exact_with_styles(
+                "01:02:03",
+                fmt,
+                Locale::en,
+                TimeSpanStyles::AssumeNegative
+            ),
+            Ok(ts4(0, 1, 2, 3)),
+            "format={fmt:?}",
+        );
+    }
     assert_eq!(
         TimeSpan::parse_exact_with_styles(
-            "01:02:03",
-            "c",
+            "1:2:03:04",
+            "g",
             Locale::en,
             TimeSpanStyles::AssumeNegative
         ),
-        Ok(neg(ts4(0, 1, 2, 3))),
+        Ok(ts4(1, 2, 3, 4)),
+    );
+    assert_eq!(
+        TimeSpan::parse_exact_with_styles(
+            "1:02:03:04.0000000",
+            "G",
+            Locale::en,
+            TimeSpanStyles::AssumeNegative
+        ),
+        Ok(ts4(1, 2, 3, 4)),
     );
 }
 
@@ -771,6 +798,44 @@ fn parse_exact_with_styles_assume_negative_zero_stays_zero() {
     assert_eq!(
         TimeSpan::parse_exact_with_styles("0", "%d", Locale::en, TimeSpanStyles::AssumeNegative),
         Ok(TimeSpan::ZERO),
+    );
+}
+
+// ── ParseExact — "c" format edge cases ────────────────────────────────────────
+//
+// Source: C# TimeSpanParse.cs `StringParser.ParseTime` (lines 1639–1660 in the
+// dotnet/runtime reference implementation). ParseTime reads digits in a loop that
+// exits when the fraction tick counter `f` reaches 1 (after exactly 7 digits). Any
+// character remaining after that exit is detected by `_pos < _str.Length` at the
+// call site and causes a FormatException.
+
+#[test]
+fn parse_exact_c_trailing_dot_no_fraction() {
+    // ParseTime: after the loop for fractional digits, if no digits were read the
+    // fraction is zero. A trailing '.' with nothing after it enters the loop but
+    // immediately sees end-of-input → zero fraction, ParseTime returns success.
+    assert_eq!(
+        TimeSpan::parse_exact("00:00:01.", "c").unwrap(),
+        ts4(0, 0, 0, 1),
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("1.02:03:04.", "c").unwrap(),
+        ts4(1, 2, 3, 4),
+    );
+}
+
+#[test]
+fn parse_exact_c_too_many_fractional_digits() {
+    // ParseTime reads exactly 7 fraction digits; the 8th character remains unconsumed.
+    // The call site then sees _pos < _str.Length and returns SetBadTimeSpanFailure.
+    // "00000001" has 8 digits; the 8th ('1') is at offset 16 in the full input.
+    assert_eq!(
+        TimeSpan::parse_exact("00:00:01.00000001", "c")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected [-][d.]hh:mm[:ss[.fffffff]]
+  "00:00:01.00000001"
+                   ^"#,
     );
 }
 
@@ -853,17 +918,37 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
     );
 }
 
+// C# TimeSpanParse.cs `TryTimeToTicks` (dotnet/runtime): the function that converts
+// parsed h/m/s components to ticks performs NO per-component range checks — it only
+// checks that the total tick value is within [MinValue, MaxValue]. Out-of-range
+// components for custom formats therefore normalise automatically:
+// e.g. 26h → 1d 2h, 60m → 1h, 60s → 1m.
 #[test]
-fn parse_exact_overflow_custom_format() {
-    // 35 hours exceeds valid range for "h" specifier
+fn parse_exact_overflow_custom_format_normalizes() {
+    // 12d 35h 32m 43s — hours 35 > 23 but no range check in custom format path.
+    // Total = tick-equivalent of 13d 11h 32m 43s.
     assert_eq!(
-        TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s")
-            .unwrap_err()
-            .to_string(),
-        r#"hours value 35 is out of range; must be 0-23
-  "12.35:32:43"
-      ^"#,
+        TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s").unwrap(),
+        ts4(12, 35, 32, 43),
     );
+}
+
+#[test]
+fn parse_exact_custom_format_percent_h_overflow() {
+    // TimeSpan.ParseExact("26", "%h", null) → 1d 2h (C# docs example)
+    assert_eq!(TimeSpan::parse_exact("26", "%h").unwrap(), ts4(0, 26, 0, 0),);
+}
+
+#[test]
+fn parse_exact_custom_format_percent_m_overflow() {
+    // 60 minutes normalises to 1h 0m
+    assert_eq!(TimeSpan::parse_exact("60", "%m").unwrap(), ts4(0, 0, 60, 0),);
+}
+
+#[test]
+fn parse_exact_custom_format_percent_s_overflow() {
+    // 60 seconds normalises to 1m 0s
+    assert_eq!(TimeSpan::parse_exact("60", "%s").unwrap(), ts4(0, 0, 0, 60),);
 }
 
 #[test]
@@ -1097,5 +1182,29 @@ fn doc_custom_uppercase_fffffff_parse_h_m_ss_dot_fffffff() {
         Ok(TimeSpan::from_ticks(
             3 * TimeSpan::TICKS_PER_SECOND + 1_279_569
         )),
+    );
+}
+
+// C# TimeSpanTests.cs — ParseExact_Invalid_TestData (TimeSpanTests.cs lines ~2060-2065):
+// format @"hh\mm\ss" = hh (2-digit hours) + literal 'm' + m (minutes) + literal 's' + ss.
+// Both inputs fail immediately after reading hh="12" because the format expects literal 'm'
+// but the input has ':'.
+#[test]
+fn parse_exact_invalid_escaped_letter_separator_mismatch() {
+    assert_eq!(
+        TimeSpan::parse_exact("12:034:56", r"hh\mm\ss")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected hh\mm\ss
+  "12:034:56"
+     ^"#,
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("12:34:056", r"hh\mm\ss")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected hh\mm\ss
+  "12:34:056"
+     ^"#,
     );
 }

@@ -518,3 +518,16 @@ fn parse_overflow_ambiguous_hour_colon() {
    ^"#,
     );
 }
+
+#[test]
+fn parse_invalid_whitespace_only() {
+    // Whitespace-only input collapses to empty after trimming → Empty error.
+    // C# TimeSpanParse.cs: SkipBlanks leaves _pos past all whitespace, then
+    // the first structural check fails with SetBadTimeSpanFailure.
+    assert_eq!(
+        TimeSpan::parse("   ").unwrap_err().to_string(),
+        r#"input is empty
+  "   "
+   ^"#,
+    );
+}

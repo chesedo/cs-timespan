@@ -264,7 +264,10 @@ impl TimeSpan {
         styles: TimeSpanStyles,
     ) -> Result<Self, ParseError> {
         let ts = parse::parse_exact(s, fmt, decimal_sep(locale))?;
-        if styles == TimeSpanStyles::AssumeNegative && ts.ticks > 0 {
+        // C# ignores AssumeNegative for the five standard formats; it only applies
+        // to custom multi-char formats (TryParseByFormat in TimeSpanParse.cs).
+        let custom_fmt = !matches!(fmt, "c" | "t" | "T" | "g" | "G");
+        if styles == TimeSpanStyles::AssumeNegative && custom_fmt && ts.ticks > 0 {
             Ok(TimeSpan::from_ticks(-ts.ticks))
         } else {
             Ok(ts)

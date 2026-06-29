@@ -134,6 +134,10 @@ pub enum TimeSpanStyles {
 
 struct Builder<'a> {
     neg: bool,
+    // When true, hours >= 24 / minutes >= 60 / seconds >= 60 are rejected with a
+    // specific OverflowKind error. False for custom-format parsing, where C# accepts
+    // out-of-range components and normalizes them into the total tick count.
+    strict: bool,
     original: &'a str,
     days: Option<&'a str>,
     hours: Option<&'a str>,
@@ -146,6 +150,7 @@ impl<'a> Builder<'a> {
     fn new(neg: bool, original: &'a str) -> Self {
         Self {
             neg,
+            strict: true,
             original,
             days: None,
             hours: None,
@@ -155,23 +160,30 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn lenient(mut self) -> Self {
+        self.strict = false;
+        self
+    }
+
     fn build(self) -> Result<TimeSpan, ParseError> {
         let days = parse_component_uint(self.days, self.original)?;
         let h = parse_component_uint(self.hours, self.original)? as u32;
         let m = parse_component_uint(self.minutes, self.original)? as u32;
         let sv = parse_component_uint(self.seconds, self.original)? as u32;
         let frac = parse_component_frac(self.frac, self.original)?;
-        if h >= 24 {
-            let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
-            return Err(overflow(OverflowKind::Hours(h), pos, self.original));
-        }
-        if m >= 60 {
-            let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
-            return Err(overflow(OverflowKind::Minutes(m), pos, self.original));
-        }
-        if sv >= 60 {
-            let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
-            return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
+        if self.strict {
+            if h >= 24 {
+                let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
+                return Err(overflow(OverflowKind::Hours(h), pos, self.original));
+            }
+            if m >= 60 {
+                let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
+                return Err(overflow(OverflowKind::Minutes(m), pos, self.original));
+            }
+            if sv >= 60 {
+                let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
+                return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
+            }
         }
         build_ticks(self.neg, days, h, m, sv, frac, self.original)
     }
@@ -482,6 +494,16 @@ fn parse_constant(input: &str) -> Result<TimeSpan, ParseError> {
     let (sec_s, frac_s) = match it.next() {
         None => ("", None),
         Some(sf) => match sf.split_once('.') {
+            // Trailing dot with no fractional digits is accepted by C# (zero fraction).
+            Some((s, "")) => (s, None),
+            // C# reads exactly 7 frac digits; >7 leaves trailing chars → format error.
+            Some((_s, f)) if f.len() > 7 => {
+                return Err(invalid_structure(
+                    CONSTANT_EXPECTED,
+                    offset_of(input, f) + 7,
+                    input,
+                ));
+            }
             Some((s, f)) => (s, Some(f)),
             None => {
                 if sf.is_empty() {
@@ -628,7 +650,7 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;
-    let mut b = Builder::new(false, input);
+    let mut b = Builder::new(false, input).lenient();
     let mut fmt_pos = 0usize;
 
     while let Some(mut ch) = it.next() {
