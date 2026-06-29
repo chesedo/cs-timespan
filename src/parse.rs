@@ -284,8 +284,8 @@ fn invalid_structure(expected: &str, pos: usize, input: &str) -> ParseError {
     )
 }
 
-fn invalid_format(desc: &str, pos: usize, input: &str) -> ParseError {
-    ParseError::new(ParseErrorKind::InvalidFormat(desc.into()), pos, input)
+fn invalid_format(desc: &str, fmt: &str, fmt_pos: usize) -> ParseError {
+    ParseError::new(ParseErrorKind::InvalidFormat(desc.into()), fmt_pos, fmt)
 }
 
 // ── Lenient parser (parse / parse_with_culture) ───────────────────────────────
@@ -428,7 +428,7 @@ pub(crate) fn parse_exact(s: &str, fmt: &str, sep: char) -> Result<TimeSpan, Par
         "c" | "t" | "T" => parse_constant(s),
         "g" => parse_g(s, sep),
         "G" => parse_g_upper(s, sep),
-        "" => Err(invalid_format("empty format string", 0, s)),
+        "" => Err(invalid_format("empty format string", "", 0)),
         _ => parse_custom(s, fmt),
     }
 }
@@ -601,15 +601,19 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     if fmt.chars().count() < 2 {
         return Err(invalid_format(
             &format!("'{fmt}' is not a known format specifier"),
+            fmt,
             0,
-            input,
         ));
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;
     let mut b = Builder::new(false, input);
+    let mut fmt_pos = 0usize;
 
     while let Some(mut ch) = it.next() {
+        let ch_start = fmt_pos;
+        fmt_pos += ch.len_utf8();
+
         // C# TryParseByFormat: '%' consumes itself then re-enters the full switch
         // (including ParseRepeatPattern) on the next character — it is a transparent
         // pass-through. '%' at end-of-format or '%%' are both errors.
@@ -617,23 +621,26 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
             ch = it.next().ok_or_else(|| {
                 invalid_format(
                     "'%' at end of format must be followed by a specifier",
-                    offset_of(input, inp),
-                    input,
+                    fmt,
+                    ch_start,
                 )
             })?;
+            fmt_pos += ch.len_utf8();
             if ch == '%' {
                 return Err(invalid_format(
                     "'%%' is not valid; '%' must be followed by a single specifier character",
-                    offset_of(input, inp),
-                    input,
+                    fmt,
+                    ch_start,
                 ));
             }
         }
         match ch {
             'd' | 'h' | 'm' | 's' | 'f' | 'F' => {
+                let spec_start = ch_start;
                 let mut n = 1;
                 while it.peek() == Some(&ch) {
                     it.next();
+                    fmt_pos += ch.len_utf8();
                     n += 1;
                 }
                 let max = match ch {
@@ -644,20 +651,21 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                 if n > max {
                     return Err(invalid_format(
                         &format!("'{ch}' repeated {n} times; maximum is {max}"),
-                        offset_of(input, inp),
-                        input,
+                        fmt,
+                        spec_start,
                     ));
                 }
-                apply_spec(ch, n, &mut inp, &mut b, input, fmt)?;
+                apply_spec(ch, n, spec_start, &mut inp, &mut b, input, fmt)?;
             }
             '\\' => {
                 let expected = it.next().ok_or_else(|| {
                     invalid_format(
                         "'\\' in format must be followed by a character",
-                        offset_of(input, inp),
-                        input,
+                        fmt,
+                        ch_start,
                     )
                 })?;
+                fmt_pos += expected.len_utf8();
                 let got = inp
                     .chars()
                     .next()
@@ -670,17 +678,21 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
             q @ ('\'' | '"') => {
                 let mut lit = String::new();
                 let mut closed = false;
+                let quote_start = ch_start;
                 // C# DateTimeParse.TryParseQuoteString (DateTimeParse.cs line 4600):
                 // '\' inside a quoted literal escapes the next character.
                 while let Some(c) = it.next() {
+                    fmt_pos += c.len_utf8();
                     if c == '\\' {
+                        let bs_pos = fmt_pos - c.len_utf8();
                         let escaped = it.next().ok_or_else(|| {
                             invalid_format(
                                 "'\\' in format must be followed by a character",
-                                offset_of(input, inp),
-                                input,
+                                fmt,
+                                bs_pos,
                             )
                         })?;
+                        fmt_pos += escaped.len_utf8();
                         lit.push(escaped);
                     } else if c == q {
                         closed = true;
@@ -692,8 +704,8 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                 if !closed {
                     return Err(invalid_format(
                         &format!("unclosed {q:?} in format string"),
-                        offset_of(input, inp),
-                        input,
+                        fmt,
+                        quote_start,
                     ));
                 }
                 if !inp.starts_with(lit.as_str()) {
@@ -704,8 +716,8 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
             _ => {
                 return Err(invalid_format(
                     &format!("unrecognised character {ch:?} in format string"),
-                    offset_of(input, inp),
-                    input,
+                    fmt,
+                    ch_start,
                 ));
             }
         }
@@ -720,6 +732,7 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
 fn apply_spec<'a>(
     ch: char,
     n: usize,
+    fmt_pos: usize,
     inp: &mut &'a str,
     b: &mut Builder<'a>,
     original: &str,
@@ -730,8 +743,8 @@ fn apply_spec<'a>(
             if $field.is_some() {
                 return Err(invalid_format(
                     &format!("duplicate '{ch}' specifier in format"),
-                    offset_of(original, inp),
-                    original,
+                    fmt,
+                    fmt_pos,
                 ));
             }
         };

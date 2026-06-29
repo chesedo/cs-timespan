@@ -429,7 +429,7 @@ fn parse_exact_invalid_empty_format_string() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: empty format string
-  "00:00:00"
+  ""
    ^"#,
     );
 }
@@ -442,13 +442,13 @@ fn parse_exact_invalid_single_char_custom_format() {
     assert_eq!(
         TimeSpan::parse_exact("5", "d").unwrap_err().to_string(),
         r#"invalid custom format: 'd' is not a known format specifier
-  "5"
+  "d"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("5", "h").unwrap_err().to_string(),
         r#"invalid custom format: 'h' is not a known format specifier
-  "5"
+  "h"
    ^"#,
     );
 }
@@ -460,7 +460,7 @@ fn parse_exact_invalid_unknown_format_specifier() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 'V' is not a known format specifier
-  "12.5:2"
+  "V"
    ^"#,
     );
 }
@@ -470,13 +470,13 @@ fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
         TimeSpan::parse_exact("1", r"d%").unwrap_err().to_string(),
         r#"invalid custom format: '%' at end of format must be followed by a specifier
-  "1"
+  "d%"
     ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("1", r"%%d").unwrap_err().to_string(),
         r#"invalid custom format: '%%' is not valid; '%' must be followed by a single specifier character
-  "1"
+  "%%d"
    ^"#,
     );
 }
@@ -488,24 +488,24 @@ fn parse_exact_invalid_repeated_specifier() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: duplicate 'h' specifier in format
-  "12:34:56"
-      ^"#,
+  "hh\:hh\:ss"
+       ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm")
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: duplicate 'm' specifier in format
-  "12:34:56"
-         ^"#,
+  "hh\:mm\:mm"
+           ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss")
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: duplicate 's' specifier in format
-  "12:34:56"
-         ^"#,
+  "hh\:ss\:ss"
+           ^"#,
     );
 }
 
@@ -545,7 +545,7 @@ fn parse_exact_invalid_triple_specifier() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 'h' repeated 3 times; maximum is 2
-  "12:34:56"
+  "hhh\:mm\:ss"
    ^"#,
     );
     assert_eq!(
@@ -553,16 +553,16 @@ fn parse_exact_invalid_triple_specifier() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 'm' repeated 3 times; maximum is 2
-  "12:34:56"
-      ^"#,
+  "hh\:mmm\:ss"
+       ^"#,
     );
     assert_eq!(
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:sss")
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 's' repeated 3 times; maximum is 2
-  "12:34:56"
-         ^"#,
+  "hh\:mm\:sss"
+           ^"#,
     );
 }
 
@@ -586,7 +586,7 @@ fn parse_exact_invalid_f_uppercase_too_many_chars() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 'F' repeated 8 times; maximum is 7
-  "00000012"
+  "FFFFFFFF"
    ^"#,
     );
 }
@@ -599,7 +599,7 @@ fn parse_exact_invalid_d_too_many_specifiers() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: 'd' repeated 9 times; maximum is 8
-  "000000123"
+  "ddddddddd"
    ^"#,
     );
 }
@@ -611,8 +611,8 @@ fn parse_exact_invalid_duplicate_d_specifier() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: duplicate 'd' specifier in format
-  "12:34:56"
-      ^"#,
+  "dd\:dd\:hh"
+       ^"#,
     );
 }
 
@@ -635,8 +635,8 @@ fn parse_exact_invalid_unknown_specifier_vv() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: unrecognised character 'v' in format string
-  "12:34"
-      ^"#,
+  "dd\:vv"
+       ^"#,
     );
 }
 
@@ -647,8 +647,8 @@ fn parse_exact_invalid_ff_repeated() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: duplicate 'f' specifier in format
-  "12:45"
-      ^"#,
+  "ff\:ff"
+       ^"#,
     );
 }
 
@@ -659,8 +659,8 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: unclosed '"' in format string
-  "12:34 minutes"
-         ^"#,
+  "mm\:ss\ "minutes"
+           ^"#,
     );
 }
 
@@ -671,8 +671,8 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
             .unwrap_err()
             .to_string(),
         r#"invalid custom format: unclosed '\'' in format string
-  "12:34 minutes"
-         ^"#,
+  "mm\:ss\ 'minutes"
+           ^"#,
     );
 }
 
