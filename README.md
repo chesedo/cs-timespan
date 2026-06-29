@@ -1,102 +1,128 @@
 # cs-timespan
 
-A Rust library whose sole intent is to be a drop-in replacement for the C# `System.TimeSpan` struct. If you are migrating code from C# to Rust and need to parse or format time intervals in exactly the same way .NET does, this crate is for you.
+A Rust implementation of C#'s `System.TimeSpan`, for working with serialized C# time intervals.
 
-## Implementation Progress
+Internally stores a signed tick count where **1 tick = 100 nanoseconds**, identical to the C# representation. If you are migrating code from C# to Rust and need to parse or format time intervals exactly as .NET does, this crate is for you.
 
-### Interoperability
+## Usage
 
-> Construction of time intervals is intentionally delegated to [`std::time::Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) or [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html). `std::time::Duration` is unsigned and cannot represent negative intervals; `chrono::TimeDelta` supports negative values and is the closer equivalent to `System.TimeSpan`. Use whichever suits your project, then convert into this crate's types for parsing/formatting.
+```toml
+[dependencies]
+cs-timespan = "0.1"
 
-- [ ] `From<std::time::Duration>` for `TimeSpan` (always succeeds — `Duration` is unsigned)
-- [ ] `TryFrom<TimeSpan>` for `std::time::Duration` (fails if the interval is negative)
+# Optional: conversions to/from chrono::TimeDelta
+cs-timespan = { version = "0.1", features = ["chrono"] }
+```
 
-The following require the `chrono` feature flag:
+## Parsing
 
-- [ ] `From<chrono::TimeDelta>` for `TimeSpan` *(feature: `chrono`)*
-- [ ] `From<TimeSpan>` for `chrono::TimeDelta` *(feature: `chrono`)*
+`TimeSpan::parse` is lenient (mirrors `TimeSpan.Parse`); `TimeSpan::parse_exact` requires an exact format match (mirrors `TimeSpan.ParseExact`):
 
-### Constants
+```rust
+use cs_timespan::TimeSpan;
 
-- [ ] `TimeSpan::ZERO`
-- [ ] `TimeSpan::MIN_VALUE`
-- [ ] `TimeSpan::MAX_VALUE`
-- [ ] `TimeSpan::TICKS_PER_MILLISECOND`
-- [ ] `TimeSpan::TICKS_PER_SECOND`
-- [ ] `TimeSpan::TICKS_PER_MINUTE`
-- [ ] `TimeSpan::TICKS_PER_HOUR`
-- [ ] `TimeSpan::TICKS_PER_DAY`
+// Lenient parse accepts multiple formats for the same value
+let ts = TimeSpan::parse("1:2:3:4").unwrap();
 
-### Parsing — Lenient (`Parse` / `TryParse`)
+// parse_exact requires the input to match the format precisely
+let ts2 = TimeSpan::parse_exact("1.02:03:04", "c").unwrap();
+assert_eq!(ts, ts2);
 
-- [ ] `TimeSpan::parse(s: &str) -> Result<TimeSpan, ParseError>` — invariant culture
-- [ ] `TimeSpan::parse_with_culture(s: &str, culture: Culture) -> Result<...>` — culture-aware (affects decimal separator for `g`/`G` input)
-- [ ] `TimeSpan::try_parse(s: &str) -> Option<TimeSpan>`
-- [ ] `TimeSpan::try_parse_with_culture(s: &str, culture: Culture) -> Option<TimeSpan>`
-- [ ] Accept bare integer as days (e.g. `"5"` → 5 days)
-- [ ] Accept `hh:mm` (hours:minutes)
-- [ ] Accept `hh:mm:ss`
-- [ ] Accept `d.hh:mm:ss`
-- [ ] Accept `d.hh:mm:ss.fffffff`
-- [ ] Accept negative intervals via leading `-`
+// Try multiple formats at once
+let ts3 = TimeSpan::parse_exact_any("03:45", &[r"hh\:mm", "g"]).unwrap();
+```
 
-### Parsing — Strict (`ParseExact` / `TryParseExact`)
+## Formatting
 
-- [ ] `TimeSpan::parse_exact(s: &str, fmt: &str) -> Result<TimeSpan, ParseError>`
-- [ ] `TimeSpan::parse_exact_any(s: &str, fmts: &[&str]) -> Result<...>` — try multiple formats
-- [ ] `TimeSpan::parse_exact_with_culture(s, fmt, culture)`
-- [ ] `TimeSpan::parse_exact_any_with_culture(s, fmts, culture)`
-- [ ] `TimeSpan::try_parse_exact(s: &str, fmt: &str) -> Option<TimeSpan>`
-- [ ] `TimeSpan::try_parse_exact_any(s: &str, fmts: &[&str]) -> Option<TimeSpan>`
-- [ ] `TimeSpanStyles::None` — default behaviour
-- [ ] `TimeSpanStyles::AssumeNegative` — treat input as negative even without leading `-`
+`Display` uses the constant `"c"` format. `to_string_fmt` accepts any standard or custom format string:
 
-### Standard Format Specifiers (parsing + formatting)
+```rust
+use cs_timespan::TimeSpan;
 
-- [ ] `"c"` — constant/invariant: `[-][d.]hh:mm:ss[.fffffff]`
-- [ ] `"t"` — alias for `"c"`
-- [ ] `"T"` — alias for `"c"`
-- [ ] `"g"` — general short, culture-sensitive: `[-][d:]h:mm:ss[.FFFFFFF]`
-- [ ] `"G"` — general long, culture-sensitive: `[-]d:hh:mm:ss.fffffff`
+let ts = TimeSpan::from_ticks(937_845_678_900);
+assert_eq!(ts.to_string(),                 "1.02:03:04.5678900");
+assert_eq!(ts.to_string_fmt("g").unwrap(), "1:2:03:04.56789");
+assert_eq!(ts.to_string_fmt(r"d\.hh\:mm\:ss").unwrap(), "1.02:03:04");
+```
 
-### Custom Format Specifiers (parsing + formatting)
+## Arithmetic
 
-- [ ] `d` / `%d` — whole days, no leading zero
-- [ ] `dd`–`dddddddd` — whole days, padded to N digits
-- [ ] `h` / `%h` — hours component, no leading zero
-- [ ] `hh` — hours component, leading zero
-- [ ] `m` / `%m` — minutes component, no leading zero
-- [ ] `mm` — minutes component, leading zero
-- [ ] `s` / `%s` — seconds component, no leading zero
-- [ ] `ss` — seconds component, leading zero
-- [ ] `f` / `%f` — tenths of a second (exact 1 digit in parsing)
-- [ ] `ff` — hundredths of a second (exact 2 digits in parsing)
-- [ ] `fff` — milliseconds (exact 3 digits in parsing)
-- [ ] `ffff` — ten-thousandths of a second (exact 4 digits)
-- [ ] `fffff` — hundred-thousandths of a second (exact 5 digits)
-- [ ] `ffffff` — millionths of a second (exact 6 digits)
-- [ ] `fffffff` — ten-millionths / ticks (exact 7 digits)
-- [ ] `F` / `%F` — tenths of a second, optional in parsing, no trailing zero in output
-- [ ] `FF` — hundredths, optional digits in parsing, no trailing zeros
-- [ ] `FFF` — milliseconds, optional digits, no trailing zeros
-- [ ] `FFFF` — ten-thousandths, optional digits, no trailing zeros
-- [ ] `FFFFF` — hundred-thousandths, optional digits, no trailing zeros
-- [ ] `FFFFFF` — millionths, optional digits, no trailing zeros
-- [ ] `FFFFFFF` — ten-millionths, optional digits, no trailing zeros
-- [ ] `\x` — escape character (next char is literal)
-- [ ] `'...'` — quoted literal string
+Standard Rust operators work on `TimeSpan` values:
 
-### Formatting
+```rust
+use cs_timespan::TimeSpan;
 
-- [ ] `Display` impl (default `"c"` format)
-- [ ] `.to_string_fmt(fmt: &str) -> String`
-- [ ] `.to_string_fmt_with_culture(fmt: &str, culture: Culture) -> String`
-- [ ] Culture-sensitive decimal separator for `"g"` / `"G"` formats
+let hour = TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR);
+let half = TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR / 2);
 
-### Standard Traits
+assert_eq!((hour + half).to_string(), "01:30:00");
+assert_eq!((hour - half).to_string(), "00:30:00");
+assert_eq!((hour * 3).to_string(),    "03:00:00");
+assert_eq!((hour / 2).to_string(),    "00:30:00");
+assert_eq!((-hour).to_string(),       "-01:00:00");
 
-- [ ] `Clone` / `Copy`
-- [ ] `Debug`
-- [ ] `Display`
-- [ ] `Hash`
-- [ ] `Default` (equivalent to `TimeSpan::ZERO`)
+// Ratio between two spans (returns f64)
+let ratio = hour / half; // 2.0
+```
+
+## Format strings
+
+This crate supports the same standard and custom format specifiers as C#:
+
+| Format | Description | Example output |
+|--------|-------------|----------------|
+| `"c"` / `"t"` / `"T"` | Constant, culture-invariant | `1.02:03:04.5678900` |
+| `"g"` | General short, culture-sensitive | `1:2:03:04.56789` |
+| `"G"` | General long, culture-sensitive | `1:02:03:04.5678900` |
+| `d`, `dd`–`dddddddd` | Days component | `1`, `01` |
+| `h` / `hh` | Hours component | `2`, `02` |
+| `m` / `mm` | Minutes component | `3`, `03` |
+| `s` / `ss` | Seconds component | `4`, `04` |
+| `f`–`fffffff` | Sub-second digits (exact count) | `5678900` |
+| `F`–`FFFFFFF` | Sub-second digits (trailing zeros trimmed) | `56789` |
+| `%x` | Single-specifier prefix | `%h` → hours only |
+| `\x` | Literal character escape | `\:` → `:` |
+| `'...'` / `"..."` | Quoted literal | `'min'` → `min` |
+
+Refer to the Microsoft documentation for the full reference:
+- [Standard TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings)
+- [Custom TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings)
+
+## Locale support
+
+Methods with a `_with_culture` suffix accept a `Locale` to control the decimal separator used in fractional seconds:
+
+```rust
+use cs_timespan::{TimeSpan, Locale};
+
+// Croatian locale uses ',' as the decimal separator
+let ts = TimeSpan::parse_with_culture("6:12:14:45,348", Locale::hr).unwrap();
+assert_eq!(ts, TimeSpan::parse_with_culture("6:12:14:45.348", Locale::en).unwrap());
+
+// Format with French locale
+let ts = TimeSpan::parse("00:00:01.5").unwrap();
+assert_eq!(ts.to_string_fmt_with_culture("g", Locale::fr).unwrap(), "0:00:01,5");
+```
+
+## Conversions
+
+`TimeSpan` converts to and from `std::time::Duration`. Negative values cannot be represented as `Duration`:
+
+```rust
+use cs_timespan::TimeSpan;
+use std::time::Duration;
+
+let ts = TimeSpan::from(Duration::from_secs(90));
+assert_eq!(ts.to_string(), "00:01:30");
+
+let d = Duration::try_from(ts).unwrap();
+assert_eq!(d, Duration::from_secs(90));
+```
+
+With the `chrono` feature, conversions to and from `chrono::TimeDelta` are also available.
+
+## Interoperability notes
+
+- `TimeSpan::from_ticks` / `TimeSpan::ticks()` give direct access to the underlying 100 ns tick count, matching C#'s `TimeSpan.Ticks`.
+- `TimeSpan::ZERO`, `TimeSpan::MIN_VALUE`, and `TimeSpan::MAX_VALUE` match the C# constants.
+- Tick-unit constants (`TICKS_PER_SECOND`, etc.) are provided for constructing values without a dependency on a time library.
