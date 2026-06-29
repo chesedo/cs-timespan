@@ -13,10 +13,12 @@
 //! ```
 //! use cs_timespan::TimeSpan;
 //!
-//! let ts = TimeSpan::parse("1.02:03:04.5678900").unwrap();
-//! assert_eq!(ts.ticks(), 937_845_678_900);
+//! // Lenient parse accepts multiple formats for the same value
+//! let ts = TimeSpan::parse("1:2:3:4").unwrap();
+//! assert_eq!(ts.ticks(), 937_840_000_000);
 //!
-//! let ts2 = TimeSpan::parse_exact("1.02:03:04.5678900", "c").unwrap();
+//! // parse_exact requires the input to match the format precisely
+//! let ts2 = TimeSpan::parse_exact("1.02:03:04", "c").unwrap();
 //! assert_eq!(ts, ts2);
 //! ```
 //!
