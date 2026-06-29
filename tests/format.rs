@@ -532,3 +532,373 @@ fn format_custom_trailing_escape() {
    ^"#
     );
 }
+
+// ── Docs: standard-timespan-format-strings ────────────────────────────────────
+//
+// Examples drawn from:
+// https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
+
+// C# doc "c" section arithmetic examples — format "c" output
+// new TimeSpan(7, 45, 16) → 07:45:16
+// new TimeSpan(18, 12, 38) → 18:12:38
+// subtraction → -10:27:22
+// addition → 1.01:57:54
+#[test]
+fn doc_standard_c_format_arithmetic() {
+    let interval1 = hms(7, 45, 16);
+    let interval2 = hms(18, 12, 38);
+    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(interval1.to_string_fmt("c").unwrap(), "07:45:16");
+    assert_eq!(interval2.to_string_fmt("c").unwrap(), "18:12:38");
+    assert_eq!(diff.to_string_fmt("c").unwrap(), "-10:27:22");
+    assert_eq!(sum.to_string_fmt("c").unwrap(), "1.01:57:54");
+}
+
+// new TimeSpan(0, 0, 1, 14, 365) + TimeSpan.FromTicks(2143756) with "c"
+// = 00:01:14.3650000 + 00:00:00.2143756 = 00:01:14.5793756
+#[test]
+fn doc_standard_c_format_from_ticks() {
+    let interval1 = dhmsm(0, 0, 1, 14, 365);
+    let interval2 = TimeSpan::from_ticks(2143756);
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(interval1.to_string_fmt("c").unwrap(), "00:01:14.3650000");
+    assert_eq!(interval2.to_string_fmt("c").unwrap(), "00:00:00.2143756");
+    assert_eq!(sum.to_string_fmt("c").unwrap(), "00:01:14.5793756");
+}
+
+// C# doc "g" section arithmetic examples (invariant culture = en)
+// 7:45:16 - 18:12:38 = -10:27:22   (g)
+// 7:45:16 + 18:12:38 = 1:1:57:54   (g)
+// 0:01:14.036 + 0:00:00.2143756 = 0:01:14.2503756  (g)
+#[test]
+fn doc_standard_g_format_arithmetic() {
+    let interval1 = hms(7, 45, 16);
+    let interval2 = hms(18, 12, 38);
+    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(
+        interval1
+            .to_string_fmt_with_culture("g", Locale::en)
+            .unwrap(),
+        "7:45:16"
+    );
+    assert_eq!(
+        diff.to_string_fmt_with_culture("g", Locale::en).unwrap(),
+        "-10:27:22"
+    );
+    assert_eq!(
+        sum.to_string_fmt_with_culture("g", Locale::en).unwrap(),
+        "1:1:57:54"
+    );
+}
+
+#[test]
+fn doc_standard_g_format_fractional() {
+    // new TimeSpan(0, 0, 1, 14, 36) = 0d 0h 1m 14s 36ms
+    // TimeSpan.FromTicks(2143756)
+    let interval1 = dhmsm(0, 0, 1, 14, 36);
+    let interval2 = TimeSpan::from_ticks(2143756);
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(
+        interval1
+            .to_string_fmt_with_culture("g", Locale::en)
+            .unwrap(),
+        "0:01:14.036"
+    );
+    assert_eq!(
+        interval2
+            .to_string_fmt_with_culture("g", Locale::en)
+            .unwrap(),
+        "0:00:00.2143756"
+    );
+    assert_eq!(
+        sum.to_string_fmt_with_culture("g", Locale::en).unwrap(),
+        "0:01:14.2503756"
+    );
+}
+
+// C# doc "G" section arithmetic examples (invariant culture = en)
+// 0:07:45:16.0000000 - 0:18:12:38.0000000 = -0:10:27:22.0000000  (G)
+// 0:07:45:16.0000000 + 0:18:12:38.0000000 = 1:01:57:54.0000000   (G)
+#[test]
+fn doc_standard_g_upper_format_arithmetic() {
+    let interval1 = hms(7, 45, 16);
+    let interval2 = hms(18, 12, 38);
+    let diff = TimeSpan::from_ticks(interval1.ticks() - interval2.ticks());
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(
+        interval1
+            .to_string_fmt_with_culture("G", Locale::en)
+            .unwrap(),
+        "0:07:45:16.0000000"
+    );
+    assert_eq!(
+        interval2
+            .to_string_fmt_with_culture("G", Locale::en)
+            .unwrap(),
+        "0:18:12:38.0000000"
+    );
+    assert_eq!(
+        diff.to_string_fmt_with_culture("G", Locale::en).unwrap(),
+        "-0:10:27:22.0000000"
+    );
+    assert_eq!(
+        sum.to_string_fmt_with_culture("G", Locale::en).unwrap(),
+        "1:01:57:54.0000000"
+    );
+}
+
+#[test]
+fn doc_standard_g_upper_format_fractional() {
+    // new TimeSpan(0, 0, 1, 14, 36) and FromTicks(2143756)
+    let interval1 = dhmsm(0, 0, 1, 14, 36);
+    let interval2 = TimeSpan::from_ticks(2143756);
+    let sum = TimeSpan::from_ticks(interval1.ticks() + interval2.ticks());
+    assert_eq!(
+        interval1
+            .to_string_fmt_with_culture("G", Locale::en)
+            .unwrap(),
+        "0:00:01:14.0360000"
+    );
+    assert_eq!(
+        interval2
+            .to_string_fmt_with_culture("G", Locale::en)
+            .unwrap(),
+        "0:00:00:00.2143756"
+    );
+    assert_eq!(
+        sum.to_string_fmt_with_culture("G", Locale::en).unwrap(),
+        "0:00:01:14.2503756"
+    );
+}
+
+// ── Docs: custom-timespan-format-strings ──────────────────────────────────────
+//
+// Examples drawn from:
+// https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
+
+// Intro formatting example:
+// new TimeSpan(1, 12, 23, 62) normalises to 1d 12h 24m 2s
+// .ToString("%d")            → "1"
+// .ToString(@"dd\.hh\:mm\:ss") → "01.12:24:02"
+#[test]
+fn doc_custom_intro_format_percent_d() {
+    // new TimeSpan(1, 12, 23, 62) = 1d + 12h + 23m + 62s
+    // 62s overflows: 1m 2s → 24m 2s total → 1d 12h 24m 2s
+    let ts = dhmsm(1, 12, 24, 2, 0);
+    assert_eq!(ts.to_string_fmt("%d").unwrap(), "1");
+}
+
+#[test]
+fn doc_custom_intro_format_dd_dot_hh_colon_mm_colon_ss() {
+    let ts = dhmsm(1, 12, 24, 2, 0);
+    assert_eq!(ts.to_string_fmt(r"dd\.hh\:mm\:ss").unwrap(), "01.12:24:02");
+}
+
+// "hh" formatting: new TimeSpan(14, 3, 17) with d\.hh\:mm\:ss → "0.14:03:17"
+//                  new TimeSpan(3, 4, 3, 17) with d\.hh\:mm\:ss → "3.04:03:17"
+#[test]
+fn doc_custom_hh_format_d_dot_hh_colon_mm_colon_ss() {
+    // new TimeSpan(14, 3, 17) = 14h 3m 17s → no days
+    let ts1 = hms(14, 3, 17);
+    assert_eq!(ts1.to_string_fmt(r"d\.hh\:mm\:ss").unwrap(), "0.14:03:17");
+    // new TimeSpan(3, 4, 3, 17) = 3d 4h 3m 17s
+    let ts2 = dhms(3, 4, 3, 17);
+    assert_eq!(ts2.to_string_fmt(r"d\.hh\:mm\:ss").unwrap(), "3.04:03:17");
+}
+
+// "mm" formatting: (arriveTime - departTime) with hh\:mm → "05:16"
+// departTime = new TimeSpan(11, 12, 00), arriveTime = new TimeSpan(16, 28, 00)
+#[test]
+fn doc_custom_mm_format_travel_time() {
+    let depart = hms(11, 12, 0);
+    let arrive = hms(16, 28, 0);
+    let elapsed = TimeSpan::from_ticks(arrive.ticks() - depart.ticks());
+    assert_eq!(elapsed.to_string_fmt(r"hh\:mm").unwrap(), "05:16");
+}
+
+// "ss" formatting: FromSeconds(12.60) → "12.600", FromSeconds(6.485) → "06.485"
+#[test]
+fn doc_custom_ss_format_dot_fff() {
+    // 12.60s = 12s + 600ms
+    let ts1 = TimeSpan::from_ticks(
+        12 * TimeSpan::TICKS_PER_SECOND + 600 * TimeSpan::TICKS_PER_MILLISECOND,
+    );
+    assert_eq!(ts1.to_string_fmt(r"ss\.fff").unwrap(), "12.600");
+    // 6.485s = 6s + 485ms
+    let ts2 = TimeSpan::from_ticks(
+        6 * TimeSpan::TICKS_PER_SECOND + 485 * TimeSpan::TICKS_PER_MILLISECOND,
+    );
+    assert_eq!(ts2.to_string_fmt(r"ss\.fff").unwrap(), "06.485");
+}
+
+// "F" formatting examples from the doc
+// TimeSpan.Parse("0:0:3.669"):  %F → "6"
+// TimeSpan.Parse("0:0:3.091"):  ss\.F → "03."  (zero tenths → nothing after dot but dot is literal)
+#[test]
+fn doc_custom_uppercase_f_format() {
+    // 3.669s → 3s + 669ms → tenths digit = 6
+    let ts1 = dhmsm(0, 0, 0, 3, 669);
+    assert_eq!(ts1.to_string_fmt("%F").unwrap(), "6");
+    // 3.091s → 3s + 91ms → tenths digit = 0 → F outputs nothing
+    // but combined with "ss\.F", the dot is a literal so output is "03."
+    let ts2 = dhmsm(0, 0, 0, 3, 91);
+    assert_eq!(ts2.to_string_fmt(r"ss\.F").unwrap(), "03.");
+}
+
+// "FF" formatting examples from the doc
+// TimeSpan.Parse("0:0:3.697"):  FF → "69"
+// TimeSpan.Parse("0:0:3.809"):  ss\.FF → "03.8"  (trailing zero trimmed)
+#[test]
+fn doc_custom_uppercase_ff_format() {
+    let ts1 = dhmsm(0, 0, 0, 3, 697);
+    assert_eq!(ts1.to_string_fmt("FF").unwrap(), "69");
+    // 3.809s → hundredths = 80 → trim trailing zero → "8"
+    let ts2 = dhmsm(0, 0, 0, 3, 809);
+    assert_eq!(ts2.to_string_fmt(r"ss\.FF").unwrap(), "03.8");
+}
+
+// "FFF" formatting examples from the doc
+// TimeSpan.Parse("0:0:3.6974"):  FFF → "697"
+// TimeSpan.Parse("0:0:3.8009"):  ss\.FFF → "03.8"  (trailing zeros trimmed)
+#[test]
+fn doc_custom_uppercase_fff_format() {
+    // 3.6974s → 3s + 697.4ms → ms component = 697 (truncated by ticks)
+    // In ticks: 6974 ten-thousandths = 6974 * 1000 = 6_974_000 sub-second ticks
+    // 6_974_000 ticks → milliseconds = 697, sub-ms = 4000 ticks
+    let ts1 = TimeSpan::from_ticks(3 * TimeSpan::TICKS_PER_SECOND + 6_974_000);
+    assert_eq!(ts1.to_string_fmt("FFF").unwrap(), "697");
+    // 3.8009s → 8009 ten-thousandths sub-second = 8_009_000 ticks; ms=800, sub=9000
+    // FFF shows milliseconds only = "800", trim trailing zeros → "8"
+    let ts2 = TimeSpan::from_ticks(3 * TimeSpan::TICKS_PER_SECOND + 8_009_000);
+    assert_eq!(ts2.to_string_fmt(r"ss\.FFF").unwrap(), "03.8");
+}
+
+// "FFFFFFF" formatting examples from the doc
+// TimeSpan.Parse("0:0:3.6974974"):  FFFFFFF → "6974974"
+// TimeSpan.Parse("0:0:3.9500000"):  ss\.FFFFFFF → "03.95"  (trailing zeros trimmed)
+#[test]
+fn doc_custom_uppercase_fffffff_format() {
+    let ts1 = TimeSpan::from_ticks(3 * TimeSpan::TICKS_PER_SECOND + 6_974_974);
+    assert_eq!(ts1.to_string_fmt("FFFFFFF").unwrap(), "6974974");
+    // 3.9500000s = 3s + 9_500_000 ticks; trailing zeros trimmed → "95"
+    let ts2 = TimeSpan::from_ticks(3 * TimeSpan::TICKS_PER_SECOND + 9_500_000);
+    assert_eq!(ts2.to_string_fmt(r"ss\.FFFFFFF").unwrap(), "03.95");
+}
+
+// Other-characters section: escape and single-quote literals in formatting
+// new TimeSpan(0, 32, 45).ToString(@"mm\:ss\ \m\i\n\u\t\e\s") → "32:45 minutes"
+// new TimeSpan(0, 32, 45).ToString("mm':'ss' minutes'") → "32:45 minutes"
+#[test]
+fn doc_custom_other_chars_literal_format() {
+    let ts = hms(0, 32, 45);
+    assert_eq!(
+        ts.to_string_fmt(r"mm\:ss\ \m\i\n\u\t\e\s").unwrap(),
+        "32:45 minutes"
+    );
+    assert_eq!(
+        ts.to_string_fmt("mm':'ss' minutes'").unwrap(),
+        "32:45 minutes"
+    );
+}
+
+// "d" custom specifier — formatting examples
+// new TimeSpan(4, 3, 17) with d\.hh\:mm\:ss → "0.04:03:17"
+// new TimeSpan(3, 4, 3, 17) with d\.hh\:mm\:ss → "3.04:03:17"
+#[test]
+fn doc_custom_d_format_d_dot_hh_colon_mm_colon_ss() {
+    // new TimeSpan(4, 3, 17) = 0d 4h 3m 17s
+    let ts1 = hms(4, 3, 17);
+    assert_eq!(ts1.to_string_fmt(r"d\.hh\:mm\:ss").unwrap(), "0.04:03:17");
+    // new TimeSpan(3, 4, 3, 17) = 3d 4h 3m 17s
+    let ts2 = dhms(3, 4, 3, 17);
+    assert_eq!(ts2.to_string_fmt(r"d\.hh\:mm\:ss").unwrap(), "3.04:03:17");
+}
+
+// "dd"-"dddddddd" — formatting examples
+// new TimeSpan(0, 23, 17, 47) with dd\.hh\:mm\:ss → "00.23:17:47"
+// new TimeSpan(365, 21, 19, 45) with dd\.hh\:mm\:ss → "365.21:19:45"
+// new TimeSpan(365, 21, 19, 45) with dddd\.hh\:mm\:ss → "0365.21:19:45"
+#[test]
+fn doc_custom_dd_format_padded_days() {
+    let ts1 = dhms(0, 23, 17, 47);
+    let ts2 = dhms(365, 21, 19, 45);
+    assert_eq!(ts1.to_string_fmt(r"dd\.hh\:mm\:ss").unwrap(), "00.23:17:47");
+    assert_eq!(
+        ts2.to_string_fmt(r"dd\.hh\:mm\:ss").unwrap(),
+        "365.21:19:45"
+    );
+    assert_eq!(
+        ts2.to_string_fmt(r"dddd\.hh\:mm\:ss").unwrap(),
+        "0365.21:19:45"
+    );
+}
+
+// "h" custom specifier — formatting examples
+// new TimeSpan(14, 3, 17) with d\.h\:mm\:ss → "0.14:03:17"
+// new TimeSpan(3, 4, 3, 17) with d\.h\:mm\:ss → "3.4:03:17"
+#[test]
+fn doc_custom_h_format_d_dot_h_colon_mm_colon_ss() {
+    let ts1 = hms(14, 3, 17);
+    assert_eq!(ts1.to_string_fmt(r"d\.h\:mm\:ss").unwrap(), "0.14:03:17");
+    let ts2 = dhms(3, 4, 3, 17);
+    assert_eq!(ts2.to_string_fmt(r"d\.h\:mm\:ss").unwrap(), "3.4:03:17");
+}
+
+// "m" custom specifier — formatting example
+// new TimeSpan(0, 6, 32) with m\:ss → "6:32"
+// C# doc also shows new TimeSpan(3, 4, 3, 17) with m\:ss but gives "18:44"
+// (this is odd; likely a bug in VB example; C# shows ts2 = new TimeSpan(0, 18, 44))
+// We test the straightforward case.
+#[test]
+fn doc_custom_m_format_m_colon_ss() {
+    let ts1 = hms(0, 6, 32);
+    assert_eq!(ts1.to_string_fmt(r"m\:ss").unwrap(), "6:32");
+}
+
+// "s" custom specifier — format example
+// endTime - startTime = 6s 3ms
+// with s\:fff → "6:003"
+#[test]
+fn doc_custom_s_format_s_colon_fff() {
+    // startTime = new TimeSpan(0, 12, 30, 15, 0), endTime = new TimeSpan(0, 12, 30, 21, 3)
+    // diff = 6s + 3ms
+    let diff = dhmsm(0, 0, 0, 6, 3);
+    assert_eq!(diff.to_string_fmt(r"s\:fff").unwrap(), "6:003");
+}
+
+// "f" custom specifier — formatting examples from the single-specifier loop
+// TimeSpan.from_ticks(1003498765432) with "c" → 1.15:51:38.8765432
+// Then individual specifiers:
+//   %f → "8", ff → "87", fff → "876", ..., fffffff → "8765432"
+//   s\.f → "29.8" (wait: seconds=38, but sub-second fraction starts at 8)
+// Actually ticks=1003498765432:
+//   days   = 1003498765432 / 864000000000 = 1 (remainder = 139498765432)
+//   hours  = 139498765432 / 36000000000   = 3 (remainder = 31498765432)
+//   minutes= 31498765432 / 600000000      = 52 (remainder = 298765432)
+//   seconds= 298765432 / 10000000         = 29 (remainder = 8765432)
+//   The doc shows s\.f = "29.8", consistent with seconds=29, tenths=8
+#[test]
+fn doc_custom_f_format_ticks_1003498765432() {
+    let ts = TimeSpan::from_ticks(1_003_498_765_432);
+    // Verify "c" first to confirm the value
+    // 1_003_498_765_432 ticks: 1d 3h 52m 29s .8765432
+    assert_eq!(ts.to_string_fmt("c").unwrap(), "1.03:52:29.8765432");
+    // Individual f* specifiers
+    assert_eq!(ts.to_string_fmt("%f").unwrap(), "8");
+    assert_eq!(ts.to_string_fmt("ff").unwrap(), "87");
+    assert_eq!(ts.to_string_fmt("fff").unwrap(), "876");
+    assert_eq!(ts.to_string_fmt("ffff").unwrap(), "8765");
+    assert_eq!(ts.to_string_fmt("fffff").unwrap(), "87654");
+    assert_eq!(ts.to_string_fmt("ffffff").unwrap(), "876543");
+    assert_eq!(ts.to_string_fmt("fffffff").unwrap(), "8765432");
+    // s\.f* specifiers
+    assert_eq!(ts.to_string_fmt(r"s\.f").unwrap(), "29.8");
+    assert_eq!(ts.to_string_fmt(r"s\.ff").unwrap(), "29.87");
+    assert_eq!(ts.to_string_fmt(r"s\.fff").unwrap(), "29.876");
+    assert_eq!(ts.to_string_fmt(r"s\.ffff").unwrap(), "29.8765");
+    assert_eq!(ts.to_string_fmt(r"s\.fffff").unwrap(), "29.87654");
+    assert_eq!(ts.to_string_fmt(r"s\.ffffff").unwrap(), "29.876543");
+    assert_eq!(ts.to_string_fmt(r"s\.fffffff").unwrap(), "29.8765432");
+}
