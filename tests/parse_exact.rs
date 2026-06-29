@@ -487,7 +487,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:hh\:ss")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: duplicate 'h' specifier in format
+        r#"invalid custom format: duplicate 'hh' specifier in format
   "hh\:hh\:ss"
        ^"#,
     );
@@ -495,7 +495,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:mm\:mm")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: duplicate 'm' specifier in format
+        r#"invalid custom format: duplicate 'mm' specifier in format
   "hh\:mm\:mm"
            ^"#,
     );
@@ -503,7 +503,7 @@ fn parse_exact_invalid_repeated_specifier() {
         TimeSpan::parse_exact("12:34:56", r"hh\:ss\:ss")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: duplicate 's' specifier in format
+        r#"invalid custom format: duplicate 'ss' specifier in format
   "hh\:ss\:ss"
            ^"#,
     );
@@ -610,8 +610,20 @@ fn parse_exact_invalid_duplicate_d_specifier() {
         TimeSpan::parse_exact("12:34:56", r"dd\:dd\:hh")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: duplicate 'd' specifier in format
+        r#"invalid custom format: duplicate 'dd' specifier in format
   "dd\:dd\:hh"
+       ^"#,
+    );
+}
+
+#[test]
+fn parse_exact_invalid_duplicate_percent_h_specifier() {
+    assert_eq!(
+        TimeSpan::parse_exact("12:34", r"%h\:%h")
+            .unwrap_err()
+            .to_string(),
+        r#"invalid custom format: duplicate '%h' specifier in format
+  "%h\:%h"
        ^"#,
     );
 }
@@ -646,7 +658,7 @@ fn parse_exact_invalid_ff_repeated() {
         TimeSpan::parse_exact("12:45", r"ff\:ff")
             .unwrap_err()
             .to_string(),
-        r#"invalid custom format: duplicate 'f' specifier in format
+        r#"invalid custom format: duplicate 'ff' specifier in format
   "ff\:ff"
        ^"#,
     );

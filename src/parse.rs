@@ -660,7 +660,16 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
                         spec_start,
                     ));
                 }
-                apply_spec(ch, n, spec_start, &mut inp, &mut b, input, fmt)?;
+                apply_spec(
+                    ch,
+                    n,
+                    spec_start,
+                    &fmt[spec_start..fmt_pos],
+                    &mut inp,
+                    &mut b,
+                    input,
+                    fmt,
+                )?;
             }
             '\\' => {
                 let expected = it.next().ok_or_else(|| {
@@ -738,6 +747,7 @@ fn apply_spec<'a>(
     ch: char,
     n: usize,
     fmt_pos: usize,
+    spec: &str,
     inp: &mut &'a str,
     b: &mut Builder<'a>,
     original: &str,
@@ -747,7 +757,7 @@ fn apply_spec<'a>(
         ($field:expr) => {
             if $field.is_some() {
                 return Err(invalid_format(
-                    &format!("duplicate '{ch}' specifier in format"),
+                    &format!("duplicate '{spec}' specifier in format"),
                     fmt,
                     fmt_pos,
                 ));
