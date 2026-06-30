@@ -185,6 +185,17 @@ impl<'a> Builder<'a> {
                 let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
                 return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
             }
+            // h ≤ 23, m ≤ 59, sv ≤ 59: safe to narrow and use fast u64 path
+            #[allow(clippy::cast_possible_truncation)]
+            return build_ticks_strict(
+                self.neg,
+                days,
+                h as u32,
+                m as u32,
+                sv as u32,
+                frac,
+                self.original,
+            );
         }
         build_ticks(self.neg, days, h, m, sv, frac, self.original)
     }
@@ -267,6 +278,48 @@ fn offset_of(original: &str, sub: &str) -> usize {
     (sub.as_ptr() as usize).saturating_sub(original.as_ptr() as usize)
 }
 
+// Fast path for standard-format parsing: h/m/s are range-checked (≤ 23/59/59) so all
+// arithmetic stays in u64 — no u128 needed, which is significantly cheaper on x86-64.
+fn build_ticks_strict(
+    neg: bool,
+    days: u64,
+    h: u32,
+    m: u32,
+    s: u32,
+    frac: u32,
+    original: &str,
+) -> Result<TimeSpan, ParseError> {
+    let ovf = || overflow(OverflowKind::Value, 0, original);
+    // h ≤ 23, m ≤ 59, s ≤ 59, frac ≤ 9_999_999: sub ≤ 864_000_000_000 — well within u64
+    let sub = u64::from(h) * TimeSpan::TICKS_PER_HOUR.unsigned_abs()
+        + u64::from(m) * TimeSpan::TICKS_PER_MINUTE.unsigned_abs()
+        + u64::from(s) * TimeSpan::TICKS_PER_SECOND.unsigned_abs()
+        + u64::from(frac);
+    let ticks = days
+        .checked_mul(TimeSpan::TICKS_PER_DAY.unsigned_abs())
+        .and_then(|d| d.checked_add(sub))
+        .ok_or_else(ovf)?;
+    if neg {
+        let abs_min = i64::MIN.unsigned_abs(); // = i64::MAX + 1
+        match ticks.cmp(&abs_min) {
+            std::cmp::Ordering::Greater => Err(ovf()),
+            std::cmp::Ordering::Equal => Ok(TimeSpan::from_ticks(i64::MIN)),
+            std::cmp::Ordering::Less => {
+                #[allow(clippy::cast_possible_wrap)] // ticks < abs_min ≤ i64::MAX + 1
+                Ok(TimeSpan::from_ticks(-(ticks as i64)))
+            }
+        }
+    } else {
+        if ticks > i64::MAX.unsigned_abs() {
+            return Err(ovf());
+        }
+        #[allow(clippy::cast_possible_wrap)] // ticks ≤ i64::MAX
+        Ok(TimeSpan::from_ticks(ticks as i64))
+    }
+}
+
+// Lenient path for custom-format parsing: h/m/s may exceed normal ranges, so u128 is
+// required to detect overflow before truncating to i64.
 fn build_ticks(
     neg: bool,
     days: u64,
