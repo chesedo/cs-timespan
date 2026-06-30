@@ -4,11 +4,11 @@ use crate::TimeSpan;
 #[derive(Debug, Clone)]
 pub enum OverflowKind {
     /// Hours component was ≥ 24; carries the out-of-range value.
-    Hours(u32),
+    Hours(u64),
     /// Minutes component was ≥ 60; carries the out-of-range value.
-    Minutes(u32),
+    Minutes(u64),
     /// Seconds component was ≥ 60; carries the out-of-range value.
-    Seconds(u32),
+    Seconds(u64),
     /// Total tick value exceeds [`TimeSpan::MAX_VALUE`] or is below [`TimeSpan::MIN_VALUE`].
     Value,
 }
@@ -70,6 +70,7 @@ impl ParseError {
     }
 
     /// Byte index (0-based) of the offending character in the input string.
+    #[must_use]
     pub fn pos(&self) -> usize {
         self.pos
     }
@@ -87,24 +88,24 @@ impl std::fmt::Display for ParseError {
                 }
             }
             ParseErrorKind::WrongSeparator => {
-                writeln!(f, "decimal separator does not match the locale")?
+                writeln!(f, "decimal separator does not match the locale")?;
             }
             ParseErrorKind::InvalidStructure(expected) => {
-                writeln!(f, "unrecognised input structure; expected {expected}")?
+                writeln!(f, "unrecognised input structure; expected {expected}")?;
             }
             ParseErrorKind::InvalidFormat(desc) => writeln!(f, "invalid custom format: {desc}")?,
             ParseErrorKind::Overflow(reason) => match reason {
                 OverflowKind::Hours(h) => {
-                    writeln!(f, "hours value {h} is out of range; must be 0-23")?
+                    writeln!(f, "hours value {h} is out of range; must be 0-23")?;
                 }
                 OverflowKind::Minutes(m) => {
-                    writeln!(f, "minutes value {m} is out of range; must be 0-59")?
+                    writeln!(f, "minutes value {m} is out of range; must be 0-59")?;
                 }
                 OverflowKind::Seconds(s) => {
-                    writeln!(f, "seconds value {s} is out of range; must be 0-59")?
+                    writeln!(f, "seconds value {s} is out of range; must be 0-59")?;
                 }
                 OverflowKind::Value => {
-                    writeln!(f, "TimeSpan value is outside the representable range")?
+                    writeln!(f, "TimeSpan value is outside the representable range")?;
                 }
             },
         }
@@ -167,9 +168,9 @@ impl<'a> Builder<'a> {
 
     fn build(self) -> Result<TimeSpan, ParseError> {
         let days = parse_component_uint(self.days, self.original)?;
-        let h = parse_component_uint(self.hours, self.original)? as u32;
-        let m = parse_component_uint(self.minutes, self.original)? as u32;
-        let sv = parse_component_uint(self.seconds, self.original)? as u32;
+        let h = parse_component_uint(self.hours, self.original)?;
+        let m = parse_component_uint(self.minutes, self.original)?;
+        let sv = parse_component_uint(self.seconds, self.original)?;
         let frac = parse_component_frac(self.frac, self.original)?;
         if self.strict {
             if h >= 24 {
@@ -232,8 +233,11 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
         ));
     }
     let total = s.len();
+    #[allow(clippy::cast_possible_truncation)] // total <= 7 keeps exponent and result in u32 range
     if total <= 7 {
-        let v = s.bytes().fold(0u32, |acc, b| acc * 10 + (b - b'0') as u32);
+        let v = s
+            .bytes()
+            .fold(0u32, |acc, b| acc * 10 + u32::from(b - b'0'));
         return Ok(v * 10u32.pow(7 - total as u32));
     }
     // C# NormalizeAndValidateFraction (TimeSpanParse.cs line 148): fractions longer than
@@ -248,9 +252,12 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
     }
     let num = s[zeroes..]
         .bytes()
-        .fold(0u64, |acc, b| acc * 10 + (b - b'0') as u64);
+        .fold(0u64, |acc, b| acc * 10 + u64::from(b - b'0'));
+    #[allow(clippy::cast_possible_truncation)] // total - 7 < 8, fits u32
     let power = 10u64.pow((total - 7) as u32);
-    Ok(((num + power / 2) / power) as u32)
+    #[allow(clippy::cast_possible_truncation)] // rounded result ≤ 9_999_999, fits u32
+    let result = ((num + power / 2) / power) as u32;
+    Ok(result)
 }
 
 // ── Low-level helpers ─────────────────────────────────────────────────────────
@@ -263,19 +270,19 @@ fn offset_of(original: &str, sub: &str) -> usize {
 fn build_ticks(
     neg: bool,
     days: u64,
-    h: u32,
-    m: u32,
-    s: u32,
+    h: u64,
+    m: u64,
+    s: u64,
     frac: u32,
     original: &str,
 ) -> Result<TimeSpan, ParseError> {
     let ovf = || overflow(OverflowKind::Value, 0, original);
-    let ticks = (days as u128)
+    let ticks = u128::from(days)
         .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
-        .and_then(|t| t.checked_add(h as u128 * TimeSpan::TICKS_PER_HOUR as u128))
-        .and_then(|t| t.checked_add(m as u128 * TimeSpan::TICKS_PER_MINUTE as u128))
-        .and_then(|t| t.checked_add(s as u128 * TimeSpan::TICKS_PER_SECOND as u128))
-        .and_then(|t| t.checked_add(frac as u128))
+        .and_then(|t| t.checked_add(u128::from(h) * TimeSpan::TICKS_PER_HOUR as u128))
+        .and_then(|t| t.checked_add(u128::from(m) * TimeSpan::TICKS_PER_MINUTE as u128))
+        .and_then(|t| t.checked_add(u128::from(s) * TimeSpan::TICKS_PER_SECOND as u128))
+        .and_then(|t| t.checked_add(u128::from(frac)))
         .ok_or_else(ovf)?;
     if neg {
         const ABS_MIN: u128 = (i64::MAX as u128) + 1;
@@ -284,11 +291,14 @@ fn build_ticks(
         } else if ticks == ABS_MIN {
             return Ok(TimeSpan::from_ticks(i64::MIN));
         }
+        #[allow(clippy::cast_possible_truncation)]
+        // ticks <= ABS_MIN <= i64::MAX + 1, checked above
         Ok(TimeSpan::from_ticks(-(ticks as i64)))
     } else {
         if ticks > i64::MAX as u128 {
             return Err(ovf());
         }
+        #[allow(clippy::cast_possible_truncation)] // ticks <= i64::MAX, checked above
         Ok(TimeSpan::from_ticks(ticks as i64))
     }
 }
@@ -319,6 +329,7 @@ fn overflow(kind: OverflowKind, pos: usize, input: &str) -> ParseError {
 // ── Lenient parser (parse / parse_with_culture) ───────────────────────────────
 
 /// Lenient: `[-]{d | [d.]h:mm[:ss[.FFFFFFF]] | d:h:mm:ss[.FFFFFFF]}`
+#[allow(clippy::too_many_lines)]
 pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
     let (neg, s) = strip_neg(input.trim());
     if s.is_empty() {
@@ -346,34 +357,30 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     }
 
     // The first segment may carry a days prefix: `d.h` or just `h`.
-    let (days_str, first_s) = match head.split_once('.') {
-        Some((d, h)) => {
-            if d.is_empty() || h.is_empty() {
-                let pos = offset_of(input, head) + head.find('.').unwrap();
-                return Err(invalid_structure(LENIENT_EXPECTED, pos, input));
-            }
-            (Some(d), h)
+    let (days_str, first_s) = if let Some((d, h)) = head.split_once('.') {
+        if d.is_empty() || h.is_empty() {
+            let pos = offset_of(input, head) + head.find('.').unwrap();
+            return Err(invalid_structure(LENIENT_EXPECTED, pos, input));
         }
-        None => {
-            if head.is_empty() {
-                return Err(invalid_structure(LENIENT_EXPECTED, 0, input));
-            }
-            (None, head)
+        (Some(d), h)
+    } else {
+        if head.is_empty() {
+            return Err(invalid_structure(LENIENT_EXPECTED, 0, input));
         }
+        (None, head)
     };
 
     // The fractional part is always in the last colon-split component (p3 > p2 > p1).
     // Pre-parse it once so the match arms only deal with structure.
     let last = p3.or(p2).or(p1).unwrap(); // p1 always Some — early-returned above
-    let (last_int, frac_s) = match last.split_once(sep) {
-        Some((i, f)) => (i, Some(f)),
-        None => {
-            if sep != '.' && last.contains('.') {
-                let pos = offset_of(input, last) + last.find('.').unwrap();
-                return Err(ParseError::new(ParseErrorKind::WrongSeparator, pos, input));
-            }
-            (last, None)
+    let (last_int, frac_s) = if let Some((i, f)) = last.split_once(sep) {
+        (i, Some(f))
+    } else {
+        if sep != '.' && last.contains('.') {
+            let pos = offset_of(input, last) + last.find('.').unwrap();
+            return Err(ParseError::new(ParseErrorKind::WrongSeparator, pos, input));
         }
+        (last, None)
     };
     if last_int.is_empty() && frac_s.is_none() {
         return Err(invalid_structure(
@@ -633,6 +640,7 @@ fn parse_g_upper(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
 }
 
 /// Custom format specifier parsing.
+#[allow(clippy::too_many_lines)]
 fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     // C# TryParseExactTimeSpan (TimeSpanParse.cs line 1228): only dispatches to
     // TryParseByFormat when format.Length >= 2; a single non-standard letter is invalid.
@@ -783,6 +791,7 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     b.build()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_spec<'a>(
     ch: char,
     n: usize,
@@ -845,11 +854,7 @@ fn apply_spec<'a>(
             dup!(b.frac);
             // C# TryParseByFormat (TimeSpanParse.cs line 1317): ParseExactDigits
             // return value is ignored for 'F' — zero digits is valid (frac = 0).
-            let count = inp
-                .bytes()
-                .take(n)
-                .take_while(|b| b.is_ascii_digit())
-                .count();
+            let count = inp.bytes().take(n).take_while(u8::is_ascii_digit).count();
             if count > 0 {
                 b.frac = Some(&inp[..count]);
             }
@@ -868,11 +873,7 @@ fn read_greedy_str<'a>(
     original: &str,
     fmt: &str,
 ) -> Result<&'a str, ParseError> {
-    let n = inp
-        .bytes()
-        .take(max)
-        .take_while(|b| b.is_ascii_digit())
-        .count();
+    let n = inp.bytes().take(max).take_while(u8::is_ascii_digit).count();
     if n == 0 {
         return Err(invalid_structure(fmt, offset_of(original, inp), original));
     }

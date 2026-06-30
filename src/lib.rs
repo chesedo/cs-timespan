@@ -140,11 +140,13 @@ impl TimeSpan {
     /// let one_second = TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND);
     /// assert_eq!(one_second.to_string(), "00:00:01");
     /// ```
+    #[must_use]
     pub const fn from_ticks(ticks: i64) -> Self {
         TimeSpan { ticks }
     }
 
     /// Returns the total number of ticks (1 tick = 100 ns).
+    #[must_use]
     pub const fn ticks(self) -> i64 {
         self.ticks
     }
@@ -168,6 +170,11 @@ impl TimeSpan {
     /// assert!(TimeSpan::parse("garbage").unwrap_err().to_string().contains("expected a digit"));
     /// assert!(TimeSpan::parse("00:00:60").unwrap_err().to_string().contains("out of range"));
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the string is empty, malformed, or produces a value outside
+    /// the representable range.
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         Self::parse_with_culture(s, Locale::en)
     }
@@ -188,6 +195,11 @@ impl TimeSpan {
     ///         .contains("decimal separator"),
     /// );
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the string is empty, malformed, uses the wrong decimal
+    /// separator for the locale, or produces a value outside the representable range.
     pub fn parse_with_culture(s: &str, locale: Locale) -> Result<Self, ParseError> {
         parse::parse_lenient(s, decimal_sep(locale))
     }
@@ -215,6 +227,11 @@ impl TimeSpan {
     /// [`TimeSpan.ParseExact`]: https://learn.microsoft.com/en-us/dotnet/api/system.timespan.parseexact
     /// [Standard TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
     /// [Custom TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the string does not match the format, or the value is
+    /// outside the representable range.
     pub fn parse_exact(s: &str, fmt: &str) -> Result<Self, ParseError> {
         Self::parse_exact_with_culture(s, fmt, Locale::en)
     }
@@ -223,11 +240,20 @@ impl TimeSpan {
     /// using the invariant culture.
     ///
     /// Mirrors `TimeSpan.ParseExact` with an array of formats.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] (from the last format tried) if no format matches.
     pub fn parse_exact_any(s: &str, formats: &[&str]) -> Result<Self, ParseError> {
         Self::parse_exact_any_with_culture(s, formats, Locale::en)
     }
 
     /// Parses using a specific format and locale decimal separator.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the string does not match the format, or the value is
+    /// outside the representable range.
     pub fn parse_exact_with_culture(
         s: &str,
         fmt: &str,
@@ -238,6 +264,10 @@ impl TimeSpan {
 
     /// Tries each format string in order and returns the first successful parse,
     /// using the given locale decimal separator.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] (from the last format tried) if no format matches.
     pub fn parse_exact_any_with_culture(
         s: &str,
         formats: &[&str],
@@ -257,6 +287,11 @@ impl TimeSpan {
     ///
     /// [`TimeSpanStyles::AssumeNegative`] negates a positive result, mirroring
     /// the C# overload that accepts `TimeSpanStyles`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the string does not match the format, or the value is
+    /// outside the representable range.
     pub fn parse_exact_with_styles(
         s: &str,
         fmt: &str,
@@ -290,6 +325,11 @@ impl TimeSpan {
     /// assert_eq!(ts.to_string_fmt("hh").unwrap(),         "10");
     /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind, FormatErrorKind::UnknownSpecifier('x'));
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FormatError`] if the format string contains an unrecognised specifier or
+    /// other invalid syntax.
     pub fn to_string_fmt(&self, fmt: &str) -> Result<String, FormatError> {
         self.to_string_fmt_with_culture(fmt, Locale::en)
     }
@@ -310,6 +350,11 @@ impl TimeSpan {
     /// // "c" is always invariant regardless of locale
     /// assert_eq!(ts.to_string_fmt_with_culture("c", Locale::fr).unwrap(), "1.10:17:36.7890123");
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FormatError`] if the format string contains an unrecognised specifier or
+    /// other invalid syntax.
     pub fn to_string_fmt_with_culture(
         &self,
         fmt: &str,
@@ -341,7 +386,7 @@ mod chrono_impls {
             // num_seconds() and subsec_nanos() together give signed components.
             // For e.g. -1.5 s: num_seconds()=-1, subsec_nanos()=-500_000_000.
             let secs = delta.num_seconds();
-            let nanos = delta.subsec_nanos() as i64;
+            let nanos = i64::from(delta.subsec_nanos());
             TimeSpan::from_ticks(secs * TimeSpan::TICKS_PER_SECOND + nanos / 100)
         }
     }
@@ -364,6 +409,8 @@ impl From<std::time::Duration> for TimeSpan {
         if ticks > i64::MAX as u128 {
             TimeSpan::MAX_VALUE
         } else {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            // guarded: ticks ≤ i64::MAX
             TimeSpan::from_ticks(ticks as i64)
         }
     }
@@ -376,8 +423,12 @@ impl TryFrom<TimeSpan> for std::time::Duration {
         if ts.ticks < 0 {
             return Err(NegativeTimeSpan);
         }
+        // ticks ≥ 0, so cast to u128 is lossless; nanos fits u64/u32 by modulo bounds
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let nanos = ts.ticks as u128 * 100;
+        #[allow(clippy::cast_possible_truncation)]
         let secs = (nanos / 1_000_000_000) as u64;
+        #[allow(clippy::cast_possible_truncation)]
         let subsec_nanos = (nanos % 1_000_000_000) as u32;
         Ok(std::time::Duration::new(secs, subsec_nanos))
     }
@@ -453,6 +504,7 @@ impl std::ops::DivAssign<i64> for TimeSpan {
 
 impl std::ops::Div<TimeSpan> for TimeSpan {
     type Output = f64;
+    #[allow(clippy::cast_precision_loss)] // intentional: best-effort ratio, no exact integer guarantee
     fn div(self, rhs: TimeSpan) -> f64 {
         self.ticks as f64 / rhs.ticks as f64
     }

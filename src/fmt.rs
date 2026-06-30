@@ -44,6 +44,7 @@ impl FormatError {
     }
 
     /// Char index (0-based) of the offending character in the format string.
+    #[must_use]
     pub fn pos(&self) -> usize {
         self.pos
     }
@@ -53,7 +54,7 @@ impl std::fmt::Display for FormatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
             FormatErrorKind::RepeatTooLong(max) => {
-                writeln!(f, "specifier repeated too many times (max {max})")?
+                writeln!(f, "specifier repeated too many times (max {max})")?;
             }
             FormatErrorKind::UnknownSpecifier(ch) => writeln!(
                 f,
@@ -65,7 +66,7 @@ impl std::fmt::Display for FormatError {
                 "'%' must be followed by a single specifier (d h m s f F)"
             )?,
             FormatErrorKind::TrailingEscape => {
-                writeln!(f, "trailing '\\' must be followed by a character to escape")?
+                writeln!(f, "trailing '\\' must be followed by a character to escape")?;
             }
         }
         writeln!(f, "  \"{}\"", self.fmt)?;
@@ -81,11 +82,12 @@ struct Components {
     hours: u32,
     minutes: u32,
     seconds: u32,
-    /// Fractional-second ticks: 0..=9_999_999 (one tick = 100 ns)
+    /// Fractional-second ticks: `0..=9_999_999` (one tick = 100 ns)
     sub_sec_ticks: u32,
 }
 
 impl Components {
+    #[allow(clippy::cast_possible_truncation)] // modulo bounds each value within u32 range
     fn from_ticks(ticks: i64) -> Self {
         let abs = ticks.unsigned_abs();
         let days = abs / TimeSpan::TICKS_PER_DAY as u64;
@@ -253,7 +255,7 @@ impl Components {
                 let s = self.days.to_string();
                 if s.len() < n {
                     let mut out = String::new();
-                    write!(out, "{:0>width$}", s, width = n).unwrap(); // write! to String is infallible
+                    write!(out, "{s:0>n$}").unwrap(); // write! to String is infallible
                     out
                 } else {
                     s
@@ -287,16 +289,16 @@ pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> Result<String
 fn fmt_component(n: usize, val: u32) -> String {
     let mut out = String::new();
     if n == 1 {
-        write!(out, "{}", val).unwrap(); // write! to String is infallible
+        write!(out, "{val}").unwrap(); // write! to String is infallible
     } else {
-        write!(out, "{:02}", val).unwrap(); // write! to String is infallible
+        write!(out, "{val:02}").unwrap(); // write! to String is infallible
     }
     out
 }
 
 fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
     let mut full = String::new();
-    write!(full, "{:07}", sub_sec_ticks).unwrap(); // write! to String is infallible
+    write!(full, "{sub_sec_ticks:07}").unwrap(); // write! to String is infallible
     let s = &full[..n];
     if trim {
         s.trim_end_matches('0').to_string()
