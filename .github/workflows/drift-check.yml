@@ -1,0 +1,32 @@
+name: C# Drift Check
+
+on:
+  # 06:00 UTC on the 1st and 15th of each month — approximates a 2-week cadence.
+  schedule:
+    - cron: '0 6 1,15 * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure drift label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create csharp-drift \
+            --color FBCA04 \
+            --description "Behavioral gap vs upstream C# TimeSpan" \
+            --force
+
+      - name: Run drift check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/drift_check.py
