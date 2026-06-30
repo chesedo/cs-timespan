@@ -197,7 +197,11 @@ impl<'a> Builder<'a> {
                 self.original,
             );
         }
-        build_ticks(self.neg, days, h, m, sv, frac, self.original)
+        let ovf = || overflow(OverflowKind::Value, 0, self.original);
+        let h32 = u32::try_from(h).map_err(|_| ovf())?;
+        let m32 = u32::try_from(m).map_err(|_| ovf())?;
+        let sv32 = u32::try_from(sv).map_err(|_| ovf())?;
+        build_ticks(self.neg, days, h32, m32, sv32, frac, self.original)
     }
 }
 
@@ -318,14 +322,15 @@ fn build_ticks_strict(
     }
 }
 
-// Lenient path for custom-format parsing: h/m/s may exceed normal ranges, so u128 is
-// required to detect overflow before truncating to i64.
+// Lenient path: h/m/s may exceed normal ranges, so u128 is required to detect overflow
+// before truncating to i64. Callers must pre-check h/m/s fit in u32 (values > u32::MAX
+// would overflow i64 anyway, so returning OverflowKind::Value is correct).
 fn build_ticks(
     neg: bool,
     days: u64,
-    h: u64,
-    m: u64,
-    s: u64,
+    h: u32,
+    m: u32,
+    s: u32,
     frac: u32,
     original: &str,
 ) -> Result<TimeSpan, ParseError> {
