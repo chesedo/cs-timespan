@@ -301,6 +301,14 @@ fn from_microseconds_f64_basic() {
         TimeSpan::from_microseconds_f64(f64::NEG_INFINITY),
         Err(FromFloatError::Overflow)
     );
+    assert_eq!(
+        TimeSpan::from_microseconds_f64(1e18),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(
+        TimeSpan::from_microseconds_f64(-1e18),
+        Err(FromFloatError::Overflow)
+    );
 }
 
 // ── Boundary: exact MAX_VALUE/MIN_VALUE round-trip ─────────────────────────────

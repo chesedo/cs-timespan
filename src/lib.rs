@@ -207,6 +207,8 @@ impl TimeSpan {
 
     /// Creates a `TimeSpan` from a fractional number of days.
     ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
     /// # Errors
     ///
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
@@ -217,6 +219,8 @@ impl TimeSpan {
     }
 
     /// Creates a `TimeSpan` from a fractional number of hours.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
     ///
     /// # Errors
     ///
@@ -229,6 +233,8 @@ impl TimeSpan {
 
     /// Creates a `TimeSpan` from a fractional number of minutes.
     ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
     /// # Errors
     ///
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
@@ -239,6 +245,8 @@ impl TimeSpan {
     }
 
     /// Creates a `TimeSpan` from a fractional number of seconds.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
     ///
     /// # Errors
     ///
@@ -251,6 +259,8 @@ impl TimeSpan {
 
     /// Creates a `TimeSpan` from a fractional number of milliseconds.
     ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
     /// # Errors
     ///
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
@@ -261,6 +271,8 @@ impl TimeSpan {
     }
 
     /// Creates a `TimeSpan` from a fractional number of microseconds.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
     ///
     /// # Errors
     ///
