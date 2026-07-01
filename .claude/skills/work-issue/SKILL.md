@@ -132,6 +132,37 @@ close the loop by teaching the scanner:
    ```
 6. Report the PR URL to the user.
 
+## Step 5 — Address PR review comments
+
+Once a PR is open (from either 4a or 4b), it will typically pick up review
+comments — from the Copilot PR reviewer bot, and/or from the repo owner
+reviewing directly on GitHub. Don't wait to be asked; check for these and work
+through them as part of finishing the issue:
+
+```bash
+gh pr view <pr-number> --repo chesedo/cs-timespan --json comments,reviews
+gh api repos/chesedo/cs-timespan/pulls/<pr-number>/comments
+```
+
+Every comment gets verified before you act on it, regardless of who posted
+it — bot or repo owner. Read the actual code it refers to, and if it cites
+C# behavior, check that against current upstream rather than trusting the
+claim at face value. Being from the owner doesn't exempt a comment from this
+check — you can and should disagree with the owner too, the same as with the
+bot, if the code/upstream source says otherwise.
+
+Then, per comment:
+
+1. **If you agree**, fix it directly (edit, `cargo fmt`, `nix flake check`,
+   commit, push to the same branch), then reply on that specific comment
+   thread summarizing what changed:
+   ```bash
+   gh api repos/chesedo/cs-timespan/pulls/<pr-number>/comments/<comment-id>/replies -f body="<reply>"
+   ```
+2. **If you disagree**, do not post anything yet — draft the reply text and
+   use `AskUserQuestion` to get the user's approval before posting it (or
+   before making no change). Only call the `replies` API after they confirm.
+
 ## Notes
 
 - Never push directly to `main` or merge the PR yourself — the PR is the
