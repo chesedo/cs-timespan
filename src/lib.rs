@@ -124,25 +124,25 @@ impl std::error::Error for NegativeTimeSpan {}
 /// Mirrors the `ArgumentException`/`OverflowException` thrown by C#'s
 /// `TimeSpan.FromDays(double)` (and the other `From*(double)` factories).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FromFloatError {
+pub enum FloatError {
     /// The value was NaN.
     Nan,
     /// The value is outside the range representable by `TimeSpan`.
     Overflow,
 }
 
-impl std::fmt::Display for FromFloatError {
+impl std::fmt::Display for FloatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FromFloatError::Nan => f.write_str("value cannot be NaN"),
-            FromFloatError::Overflow => {
+            FloatError::Nan => f.write_str("value cannot be NaN"),
+            FloatError::Overflow => {
                 f.write_str("value is outside the range representable by TimeSpan")
             }
         }
     }
 }
 
-impl std::error::Error for FromFloatError {}
+impl std::error::Error for FloatError {}
 
 /// Error returned when constructing a [`TimeSpan`] from integer units overflows
 /// the range representable by `TimeSpan`.
@@ -221,25 +221,27 @@ impl TimeSpan {
     // from_days_f64_max_value_boundary/from_days_f64_min_value_boundary tests).
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
-    fn interval(value: f64, scale: f64) -> Result<Self, FromFloatError> {
+    fn interval(value: f64, scale: f64) -> Result<Self, FloatError> {
         if value.is_nan() {
-            return Err(FromFloatError::Nan);
+            return Err(FloatError::Nan);
         }
         let ticks = value * scale;
         if ticks > i64::MAX as f64 || ticks < i64::MIN as f64 {
-            return Err(FromFloatError::Overflow);
+            return Err(FloatError::Overflow);
         }
         Ok(Self::from_ticks(ticks as i64))
     }
 
     // Mirrors C#'s TimeSpan.IntervalFromDoubleTicks (TimeSpan.cs#L645-L656), used by
-    // the Multiply(double)/Divide(double) operators below. `ticks` is already the
-    // NaN-checked, rounded tick count; only the range check remains.
+    // the Multiply(double)/Divide(double) operators below. `ticks` is the rounded
+    // tick count, but it can still be NaN here even though the caller's `factor`/
+    // `divisor` isn't (e.g. `TimeSpan::ZERO.divide(0.0)` computes `0.0 / 0.0`), so
+    // the NaN check below is still load-bearing, not just a range check.
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
-    fn interval_from_double_ticks(ticks: f64) -> Result<Self, FromFloatError> {
+    fn interval_from_double_ticks(ticks: f64) -> Result<Self, FloatError> {
         if ticks.is_nan() || ticks > i64::MAX as f64 || ticks < i64::MIN as f64 {
-            return Err(FromFloatError::Overflow);
+            return Err(FloatError::Overflow);
         }
         Ok(Self::from_ticks(ticks as i64))
     }
@@ -250,10 +252,10 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)] // TICKS_PER_DAY magnitude fits f64's mantissa
-    pub fn from_days_f64(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_days_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_DAY as f64)
     }
 
@@ -263,10 +265,10 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_hours_f64(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_hours_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_HOUR as f64)
     }
 
@@ -276,10 +278,10 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_minutes_f64(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_minutes_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_MINUTE as f64)
     }
 
@@ -289,10 +291,10 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_seconds_f64(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_seconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_SECOND as f64)
     }
 
@@ -302,10 +304,10 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_milliseconds_f64(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_milliseconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_MILLISECOND as f64)
     }
 
@@ -315,31 +317,33 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
-    /// [`FromFloatError::Overflow`] if it's outside the representable range.
-    pub fn from_microseconds_f64(value: f64) -> Result<Self, FromFloatError> {
+    /// Returns [`FloatError::Nan`] if `value` is NaN, or
+    /// [`FloatError::Overflow`] if it's outside the representable range.
+    pub fn from_microseconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, 10.0)
     }
 
     // ── Float multiply/divide (mirror TimeSpan.Multiply(double)/Divide(double)) ──
-    // TimeSpan.cs#L689-L691, L908-L934: C# rounds to the nearest tick before the
-    // range check, "as close to the result we would have with unlimited precision
-    // as possible". `Result` is used instead of throwing, per this crate's
-    // established convention for anything that can hit NaN/overflow (see
-    // `from_days_f64` and friends above).
+    // TimeSpan.cs#L689-L691, L908-L934: C# rounds to the nearest tick via
+    // `Math.Round`, which defaults to `MidpointRounding.ToEven` — hence
+    // `round_ties_even()` below rather than `round()` (which breaks ties away
+    // from zero and would diverge from C# on exact half-tick results).
+    // `Result` is used instead of throwing, per this crate's established
+    // convention for anything that can hit NaN/overflow (see `from_days_f64`
+    // and friends above).
 
     /// Multiplies this `TimeSpan` by `factor`, rounding to the nearest tick.
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `factor` is NaN, or
-    /// [`FromFloatError::Overflow`] if the result is outside the representable range.
-    pub fn multiply(self, factor: f64) -> Result<Self, FromFloatError> {
+    /// Returns [`FloatError::Nan`] if `factor` is NaN, or
+    /// [`FloatError::Overflow`] if the result is outside the representable range.
+    pub fn multiply(self, factor: f64) -> Result<Self, FloatError> {
         if factor.is_nan() {
-            return Err(FromFloatError::Nan);
+            return Err(FloatError::Nan);
         }
         #[allow(clippy::cast_precision_loss)]
-        let ticks = (self.ticks as f64 * factor).round();
+        let ticks = (self.ticks as f64 * factor).round_ties_even();
         Self::interval_from_double_ticks(ticks)
     }
 
@@ -347,14 +351,14 @@ impl TimeSpan {
     ///
     /// # Errors
     ///
-    /// Returns [`FromFloatError::Nan`] if `divisor` is NaN, or
-    /// [`FromFloatError::Overflow`] if the result is outside the representable range.
-    pub fn divide(self, divisor: f64) -> Result<Self, FromFloatError> {
+    /// Returns [`FloatError::Nan`] if `divisor` is NaN, or
+    /// [`FloatError::Overflow`] if the result is outside the representable range.
+    pub fn divide(self, divisor: f64) -> Result<Self, FloatError> {
         if divisor.is_nan() {
-            return Err(FromFloatError::Nan);
+            return Err(FloatError::Nan);
         }
         #[allow(clippy::cast_precision_loss)]
-        let ticks = (self.ticks as f64 / divisor).round();
+        let ticks = (self.ticks as f64 / divisor).round_ties_even();
         Self::interval_from_double_ticks(ticks)
     }
 
@@ -957,30 +961,21 @@ impl std::ops::MulAssign<i64> for TimeSpan {
 }
 
 // TimeSpan.cs#L908-L922: C#'s `operator *(TimeSpan, double)` throws ArgumentException
-// (NaN) or OverflowException (out of range); this mirrors that with a panic, since
-// `Mul`/`Div` can't surface a `Result` through `*`/`/` syntax. Use `TimeSpan::multiply`
-// for a fallible equivalent.
+// (NaN) or OverflowException (out of range); unlike the `i64` operators above, this
+// can fail, so `Output` is a `Result` instead of panicking.
 impl std::ops::Mul<f64> for TimeSpan {
-    type Output = Self;
+    type Output = Result<Self, FloatError>;
 
-    /// # Panics
-    ///
-    /// Panics if `factor` is NaN or the result overflows `TimeSpan`'s representable
-    /// range. See [`TimeSpan::multiply`] for a non-panicking equivalent.
-    fn mul(self, rhs: f64) -> Self {
-        self.multiply(rhs).expect("TimeSpan multiply by f64 failed")
+    fn mul(self, rhs: f64) -> Self::Output {
+        self.multiply(rhs)
     }
 }
 
 impl std::ops::Mul<TimeSpan> for f64 {
-    type Output = TimeSpan;
+    type Output = Result<TimeSpan, FloatError>;
 
-    /// # Panics
-    ///
-    /// Panics if `self` is NaN or the result overflows `TimeSpan`'s representable
-    /// range. See [`TimeSpan::multiply`] for a non-panicking equivalent.
-    fn mul(self, rhs: TimeSpan) -> TimeSpan {
-        rhs.multiply(self).expect("TimeSpan multiply by f64 failed")
+    fn mul(self, rhs: TimeSpan) -> Self::Output {
+        rhs.multiply(self)
     }
 }
 
@@ -992,16 +987,12 @@ impl std::ops::Div<i64> for TimeSpan {
 }
 
 // TimeSpan.cs#L925-L934: mirrors C#'s `operator /(TimeSpan, double)`; see the `Mul<f64>`
-// impl above for why this panics instead of returning `Result`.
+// impl above for why `Output` is a `Result`.
 impl std::ops::Div<f64> for TimeSpan {
-    type Output = Self;
+    type Output = Result<Self, FloatError>;
 
-    /// # Panics
-    ///
-    /// Panics if `divisor` is NaN or the result overflows `TimeSpan`'s representable
-    /// range. See [`TimeSpan::divide`] for a non-panicking equivalent.
-    fn div(self, rhs: f64) -> Self {
-        self.divide(rhs).expect("TimeSpan divide by f64 failed")
+    fn div(self, rhs: f64) -> Self::Output {
+        self.divide(rhs)
     }
 }
 

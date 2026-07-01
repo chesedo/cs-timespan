@@ -1,4 +1,4 @@
-use cs_timespan::{FromFloatError, TimeSpan};
+use cs_timespan::{FloatError, TimeSpan};
 
 fn ts(ticks: i64) -> TimeSpan {
     TimeSpan::from_ticks(ticks)
@@ -184,23 +184,34 @@ fn multiplication_test_data() -> Vec<(TimeSpan, f64, TimeSpan)> {
 #[test]
 fn mul_f64_test_data() {
     for (timespan, factor, expected) in multiplication_test_data() {
-        assert_eq!(timespan * factor, expected);
-        assert_eq!(factor * timespan, expected);
+        assert_eq!(timespan * factor, Ok(expected));
+        assert_eq!(factor * timespan, Ok(expected));
     }
 }
 
 // TimeSpanTests.cs#L1761-1766
 #[test]
-#[should_panic(expected = "TimeSpan multiply by f64 failed")]
-fn mul_f64_overflow_panics() {
-    let _ = TimeSpan::MAX_VALUE * 1.000000001;
+fn mul_f64_overflow() {
+    assert_eq!(TimeSpan::MAX_VALUE * 1.000000001, Err(FloatError::Overflow));
 }
 
 // TimeSpanTests.cs#L1768-1773
 #[test]
-#[should_panic(expected = "TimeSpan multiply by f64 failed")]
-fn mul_f64_nan_panics() {
-    let _ = TimeSpan::from_days(1).unwrap() * f64::NAN;
+fn mul_f64_nan() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap() * f64::NAN,
+        Err(FloatError::Nan)
+    );
+}
+
+// C#'s Math.Round defaults to MidpointRounding.ToEven; verify exact half-tick
+// results round to the nearest even tick, not away from zero.
+#[test]
+fn mul_f64_midpoint_rounds_to_even() {
+    assert_eq!(ts(1) * 0.5, Ok(ts(0)));
+    assert_eq!(ts(3) * 0.5, Ok(ts(2)));
+    assert_eq!(ts(-1) * 0.5, Ok(ts(0)));
+    assert_eq!(ts(-3) * 0.5, Ok(ts(-2)));
 }
 
 // TimeSpanTests.cs#L1775-1781
@@ -208,7 +219,7 @@ fn mul_f64_nan_panics() {
 fn div_f64_test_data() {
     for (timespan, factor, expected) in multiplication_test_data() {
         let divisor = 1.0 / factor;
-        assert_eq!(timespan / divisor, expected);
+        assert_eq!(timespan / divisor, Ok(expected));
     }
 }
 
@@ -217,20 +228,22 @@ fn div_f64_test_data() {
 fn div_f64_by_zero_overflows() {
     assert_eq!(
         TimeSpan::from_days(1).unwrap().divide(0.0),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_days(-1).unwrap().divide(0.0),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FromFloatError::Overflow));
+    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FloatError::Overflow));
 }
 
 // TimeSpanTests.cs#L1794-1798
 #[test]
-#[should_panic(expected = "TimeSpan divide by f64 failed")]
-fn div_f64_nan_panics() {
-    let _ = TimeSpan::from_days(1).unwrap() / f64::NAN;
+fn div_f64_nan() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap() / f64::NAN,
+        Err(FloatError::Nan)
+    );
 }
 
 // TimeSpanTests.cs#L1800-1804
@@ -246,7 +259,7 @@ fn multiply_method_test_data() {
 fn multiply_method_overflow() {
     assert_eq!(
         TimeSpan::MAX_VALUE.multiply(1.000000001),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
 }
 
@@ -255,7 +268,7 @@ fn multiply_method_overflow() {
 fn multiply_method_nan() {
     assert_eq!(
         TimeSpan::from_days(1).unwrap().multiply(f64::NAN),
-        Err(FromFloatError::Nan)
+        Err(FloatError::Nan)
     );
 }
 
@@ -273,13 +286,13 @@ fn divide_method_test_data() {
 fn divide_method_by_zero() {
     assert_eq!(
         TimeSpan::from_days(1).unwrap().divide(0.0),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_days(-1).unwrap().divide(0.0),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FromFloatError::Overflow));
+    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FloatError::Overflow));
 }
 
 // TimeSpanTests.cs#L1837-1841
@@ -287,7 +300,7 @@ fn divide_method_by_zero() {
 fn divide_method_nan() {
     assert_eq!(
         TimeSpan::from_days(1).unwrap().divide(f64::NAN),
-        Err(FromFloatError::Nan)
+        Err(FloatError::Nan)
     );
 }
 
