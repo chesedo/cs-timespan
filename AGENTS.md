@@ -32,3 +32,8 @@ The flake (`flake.nix`) is the source of truth for checks — it's what CI
 
 Whenever the user corrects an approach or decision, consider whether it should be
 recorded here so the same mistake isn't repeated in future sessions.
+
+If the correction is about something a skill (`.claude/skills/*/SKILL.md`) did
+or instructed, ask the user whether the skill file itself should be updated to
+reflect the correction, so the same mistake isn't repeated the next time that
+skill runs.
