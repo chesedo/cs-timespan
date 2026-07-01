@@ -41,6 +41,66 @@ fn sub_zero() {
     assert_eq!(ts(7 * MIN) - TimeSpan::ZERO, ts(7 * MIN));
 }
 
+// ── Overflow ──────────────────────────────────────────────────────────────────
+// TimeSpan.cs#L893 (operator+), #L877 (operator-), #L868 (unary operator-):
+// C# throws OverflowException on tick overflow; the operator impls here panic
+// consistently (not relying on debug-only overflow checks), and checked_*
+// gives callers a non-panicking alternative.
+
+#[test]
+#[should_panic(expected = "TimeSpan add overflowed")]
+fn add_overflow_panics() {
+    let _ = TimeSpan::MAX_VALUE + ts(1);
+}
+
+#[test]
+#[should_panic(expected = "TimeSpan sub overflowed")]
+fn sub_overflow_panics() {
+    let _ = TimeSpan::MIN_VALUE - ts(1);
+}
+
+#[test]
+#[should_panic(expected = "TimeSpan neg overflowed")]
+fn neg_min_value_panics() {
+    let _ = -TimeSpan::MIN_VALUE;
+}
+
+#[test]
+fn checked_add_ok() {
+    assert_eq!(ts(3 * HR).checked_add(ts(2 * HR)), Ok(ts(5 * HR)));
+}
+
+#[test]
+fn checked_add_overflow() {
+    assert_eq!(
+        TimeSpan::MAX_VALUE.checked_add(ts(1)),
+        Err(TimeSpanOverflow)
+    );
+}
+
+#[test]
+fn checked_sub_ok() {
+    assert_eq!(ts(5 * DAY).checked_sub(ts(2 * DAY)), Ok(ts(3 * DAY)));
+}
+
+#[test]
+fn checked_sub_overflow() {
+    assert_eq!(
+        TimeSpan::MIN_VALUE.checked_sub(ts(1)),
+        Err(TimeSpanOverflow)
+    );
+}
+
+#[test]
+fn checked_neg_ok() {
+    assert_eq!(ts(3 * SEC).checked_neg(), Ok(ts(-3 * SEC)));
+}
+
+#[test]
+fn checked_neg_min_value_overflow() {
+    assert_eq!(TimeSpan::MIN_VALUE.checked_neg(), Err(TimeSpanOverflow));
+}
+
 // ── Neg ───────────────────────────────────────────────────────────────────────
 
 #[test]

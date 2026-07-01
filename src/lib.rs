@@ -931,36 +931,87 @@ impl TryFrom<TimeSpan> for std::time::Duration {
 
 // ── Arithmetic ────────────────────────────────────────────────────────────────
 
+impl TimeSpan {
+    /// Adds two `TimeSpan`s, returning [`TimeSpanOverflow`] instead of panicking
+    /// if the result is outside the representable range.
+    ///
+    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator+`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    // TimeSpan.cs#L893
+    pub const fn checked_add(self, rhs: Self) -> Result<Self, TimeSpanOverflow> {
+        match self.ticks.checked_add(rhs.ticks) {
+            Some(ticks) => Ok(Self::from_ticks(ticks)),
+            None => Err(TimeSpanOverflow),
+        }
+    }
+
+    /// Subtracts two `TimeSpan`s, returning [`TimeSpanOverflow`] instead of
+    /// panicking if the result is outside the representable range.
+    ///
+    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator-`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    // TimeSpan.cs#L877
+    pub const fn checked_sub(self, rhs: Self) -> Result<Self, TimeSpanOverflow> {
+        match self.ticks.checked_sub(rhs.ticks) {
+            Some(ticks) => Ok(Self::from_ticks(ticks)),
+            None => Err(TimeSpanOverflow),
+        }
+    }
+
+    /// Negates the `TimeSpan`, returning [`TimeSpanOverflow`] instead of
+    /// panicking for [`TimeSpan::MIN_VALUE`], which has no positive counterpart.
+    ///
+    /// Mirrors the `OverflowException` thrown by C#'s unary `TimeSpan.operator-`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] for [`TimeSpan::MIN_VALUE`], whose negation is
+    /// outside the representable range.
+    // TimeSpan.cs#L868
+    pub const fn checked_neg(self) -> Result<Self, TimeSpanOverflow> {
+        match self.ticks.checked_neg() {
+            Some(ticks) => Ok(Self::from_ticks(ticks)),
+            None => Err(TimeSpanOverflow),
+        }
+    }
+}
+
 impl std::ops::Add for TimeSpan {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Self::from_ticks(self.ticks + rhs.ticks)
+        self.checked_add(rhs).expect("TimeSpan add overflowed")
     }
 }
 
 impl std::ops::Sub for TimeSpan {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
-        Self::from_ticks(self.ticks - rhs.ticks)
+        self.checked_sub(rhs).expect("TimeSpan sub overflowed")
     }
 }
 
 impl std::ops::Neg for TimeSpan {
     type Output = Self;
     fn neg(self) -> Self {
-        Self::from_ticks(-self.ticks)
+        self.checked_neg().expect("TimeSpan neg overflowed")
     }
 }
 
 impl std::ops::AddAssign for TimeSpan {
     fn add_assign(&mut self, rhs: Self) {
-        self.ticks += rhs.ticks;
+        *self = *self + rhs;
     }
 }
 
 impl std::ops::SubAssign for TimeSpan {
     fn sub_assign(&mut self, rhs: Self) {
-        self.ticks -= rhs.ticks;
+        *self = *self - rhs;
     }
 }
 
