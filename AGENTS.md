@@ -29,6 +29,17 @@ from `TimeSpanTests.cs`): cite the file and line(s) of the test being mirrored,
 directly above the test function, so it's clear which upstream case is being
 reproduced and easy to check if that case changes.
 
+## Test coverage parity
+
+When porting a C# test suite's data-driven test (`[Theory]`/`[MemberData]`/
+`[InlineData]`), match **all** of the upstream cases at minimum — not just a
+representative sample. This includes combinatorially-generated data sets (e.g.
+a C# helper that loops over N values to yield every pairwise combination):
+port every generated row, not a hand-picked subset, even if that means the
+Rust test file ends up large. If a case is genuinely infeasible to port
+(e.g. it depends on a C#-only construct with no Rust equivalent), state that
+explicitly in a comment rather than silently omitting it.
+
 ## Nix
 
 The flake (`flake.nix`) is the source of truth for checks — it's what CI
