@@ -200,19 +200,27 @@ fn from_milliseconds_invalid() {
 
 // ── FromMicroseconds(double) ──────────────────────────────────────────────────
 // No dedicated upstream (double) test data exists for this overload; covered here
-// directly instead.
+// directly instead. Method definition: TimeSpan.cs#L679
 
 #[test]
 fn from_microseconds_basic() {
     assert_eq!(TimeSpan::from_microseconds(15.0).unwrap().ticks(), 150);
     assert_eq!(TimeSpan::from_microseconds(-15.0).unwrap().ticks(), -150);
     assert_eq!(TimeSpan::from_microseconds(0.0).unwrap().ticks(), 0);
+    // Fractional input; also locks in truncation-toward-zero (25.5 ticks -> 25, not 26)
+    assert_eq!(TimeSpan::from_microseconds(2.5).unwrap().ticks(), 25);
+    assert_eq!(TimeSpan::from_microseconds(2.55).unwrap().ticks(), 25);
+    assert_eq!(TimeSpan::from_microseconds(-2.55).unwrap().ticks(), -25);
     assert_eq!(
         TimeSpan::from_microseconds(f64::NAN),
         Err(FromFloatError::Nan)
     );
     assert_eq!(
         TimeSpan::from_microseconds(f64::INFINITY),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(
+        TimeSpan::from_microseconds(f64::NEG_INFINITY),
         Err(FromFloatError::Overflow)
     );
 }

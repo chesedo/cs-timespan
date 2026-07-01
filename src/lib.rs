@@ -121,8 +121,8 @@ impl std::error::Error for NegativeTimeSpan {}
 
 /// Error returned when constructing a [`TimeSpan`] from a floating-point value fails.
 ///
-/// Mirrors the `ArgumentException`/`OverflowException` C#'s `TimeSpan.FromDays` (and
-/// the other `From*(double)` factories) throw.
+/// Mirrors the `ArgumentException`/`OverflowException` thrown by C#'s
+/// `TimeSpan.FromDays(double)` (and the other `From*(double)` factories).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FromFloatError {
     /// The value was NaN.
@@ -184,7 +184,11 @@ impl TimeSpan {
     }
 
     // ── Float factory methods (mirror FromDays(double) / FromHours(double) / ...) ──
-    #[allow(clippy::cast_precision_loss)] // i64::MIN/MAX magnitude fits f64's mantissa
+    // i64::MAX rounds up to 2^63 when cast to f64 (i64::MIN is exact, being a power of
+    // two); harmless here since it only widens the boundary check, and the saturating
+    // "as i64" cast below still clamps to the correct value at that boundary (see
+    // from_days_max_value_boundary/from_days_min_value_boundary tests).
+    #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
     fn interval(value: f64, scale: f64) -> Result<Self, FromFloatError> {
         if value.is_nan() {
