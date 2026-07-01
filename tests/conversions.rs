@@ -16,6 +16,11 @@ fn from_duration_one_second() {
 }
 
 #[test]
+fn nanoseconds_per_tick_matches_csharp() {
+    assert_eq!(TimeSpan::NANOSECONDS_PER_TICK, 100);
+}
+
+#[test]
 fn from_duration_one_tick() {
     // 100 ns = 1 tick
     assert_eq!(
