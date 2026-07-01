@@ -59,6 +59,7 @@ fn neg_zero() {
 }
 
 // ── Duration ──────────────────────────────────────────────────────────────────
+// TimeSpan.cs#L416-423
 
 #[test]
 fn duration_positive() {
