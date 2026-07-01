@@ -74,6 +74,7 @@ fn negative_totals() {
 // ── TotalMilliseconds clamping at the i64 tick boundaries ───────────────────────
 // C# clamps TotalMilliseconds to MinMilliseconds/MaxMilliseconds because casting
 // MIN_VALUE/MAX_VALUE ticks to f64 and dividing can round past the true boundary.
+// Duplicates TotalMilliseconds_Invalid: TimeSpanTests.cs#L147-L154
 
 #[test]
 fn total_milliseconds_clamps_at_max_value() {
