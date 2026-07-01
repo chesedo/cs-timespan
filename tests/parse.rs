@@ -1,7 +1,8 @@
 // Tests ported from the C# reference implementation:
-// https://github.com/dotnet/corefx/blob/master/src/System.Runtime/tests/System/TimeSpanTests.cs
+// https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs
 //
-// C# test methods covered here: Parse_Valid_TestData, Parse_Invalid_TestData
+// C# test methods covered here: Parse_Valid_TestData (TimeSpanTests.cs#L1006-1078),
+// Parse_Invalid_TestData (TimeSpanTests.cs#L1106-1142)
 //
 // Notes on translation:
 // - C# `ArgumentNullException` for null input has no Rust equivalent (`&str` can't be null)
@@ -61,16 +62,19 @@ fn ts5(d: i64, h: i64, m: i64, s: i64, ms: i64) -> TimeSpan {
 
 // ── Parse_Valid_TestData ──────────────────────────────────────────────────────
 
+// TimeSpanTests.cs#L1009
 #[test]
 fn parse_valid_leading_whitespace() {
     assert_eq!(TimeSpan::parse("       12:24:02"), Ok(ts5(0, 12, 24, 2, 0)));
 }
 
+// TimeSpanTests.cs#L1010
 #[test]
 fn parse_valid_trailing_whitespace() {
     assert_eq!(TimeSpan::parse("12:24:02      "), Ok(ts5(0, 12, 24, 2, 0)));
 }
 
+// TimeSpanTests.cs#L1011
 #[test]
 fn parse_valid_surrounding_whitespace() {
     assert_eq!(
@@ -79,27 +83,32 @@ fn parse_valid_surrounding_whitespace() {
     );
 }
 
+// TimeSpanTests.cs#L1014
 #[test]
 fn parse_valid_bare_zero() {
     assert_eq!(TimeSpan::parse("0"), Ok(ts5(0, 0, 0, 0, 0)));
 }
 
+// TimeSpanTests.cs#L1017
 #[test]
 fn parse_valid_hm() {
     assert_eq!(TimeSpan::parse("12:24"), Ok(ts5(0, 12, 24, 0, 0)));
 }
 
+// TimeSpanTests.cs#L1020
 #[test]
 fn parse_valid_hms() {
     assert_eq!(TimeSpan::parse("12:24:02"), Ok(ts5(0, 12, 24, 2, 0)));
 }
 
+// TimeSpanTests.cs#L1023
 #[test]
 fn parse_valid_d_dot_hm() {
     // "12.03:04" — days.hours:minutes (no seconds)
     assert_eq!(TimeSpan::parse("12.03:04"), Ok(ts4(12, 3, 4, 0)));
 }
 
+// TimeSpanTests.cs#L1026
 #[test]
 fn parse_valid_fractional_two_digits() {
     assert_eq!(
@@ -108,6 +117,7 @@ fn parse_valid_fractional_two_digits() {
     );
 }
 
+// TimeSpanTests.cs#L1029-1030
 #[test]
 fn parse_valid_fractional_trailing_zeros() {
     // .0 and .0000000 both mean zero sub-second ticks
@@ -121,6 +131,7 @@ fn parse_valid_fractional_trailing_zeros() {
     );
 }
 
+// TimeSpanTests.cs#L1031-1037
 #[test]
 fn parse_valid_fractional_precision() {
     // Each additional fractional digit adds sub-millisecond precision
@@ -154,17 +165,20 @@ fn parse_valid_fractional_precision() {
     );
 }
 
+// TimeSpanTests.cs#L1040
 #[test]
 fn parse_valid_d_dot_hms() {
     assert_eq!(TimeSpan::parse("1.12:24:02"), Ok(ts4(1, 12, 24, 2)));
 }
 
+// TimeSpanTests.cs#L1043
 #[test]
 fn parse_valid_d_colon_hms() {
     // Alternative form: days separated by colon instead of dot
     assert_eq!(TimeSpan::parse("1:12:24:02"), Ok(ts4(1, 12, 24, 2)));
 }
 
+// TimeSpanTests.cs#L1046
 #[test]
 fn parse_valid_empty_seconds_with_fraction() {
     // "01.23:45:.67" — seconds component is empty, fraction is present
@@ -174,6 +188,7 @@ fn parse_valid_empty_seconds_with_fraction() {
     );
 }
 
+// TimeSpanTests.cs#L1049
 #[test]
 fn parse_valid_full_with_millis() {
     assert_eq!(
@@ -182,6 +197,7 @@ fn parse_valid_full_with_millis() {
     );
 }
 
+// TimeSpanTests.cs#L1052-1058
 #[test]
 fn parse_valid_hm_fractional_precision() {
     // h:m:.fraction — seconds component empty
@@ -215,6 +231,7 @@ fn parse_valid_hm_fractional_precision() {
     );
 }
 
+// TimeSpanTests.cs#L1061-1066
 #[test]
 fn parse_valid_near_max_value() {
     // Values approaching TimeSpan.MaxValue
@@ -244,6 +261,7 @@ fn parse_valid_near_max_value() {
     );
 }
 
+// TimeSpanTests.cs#L1067-1070
 #[test]
 fn parse_valid_common_values() {
     assert_eq!(TimeSpan::parse("00:00:59"), Ok(ts3(0, 0, 59)));
@@ -253,6 +271,7 @@ fn parse_valid_common_values() {
     assert_eq!(TimeSpan::parse("24:00:00"), Ok(ts4(24, 0, 0, 0)));
 }
 
+// TimeSpanTests.cs#L1076
 #[test]
 fn parse_valid_croatian_culture_comma_separator() {
     // hr-HR uses comma as the decimal separator
@@ -264,6 +283,7 @@ fn parse_valid_croatian_culture_comma_separator() {
 
 // ── Parse_Invalid_TestData — FormatException cases ────────────────────────────
 
+// TimeSpanTests.cs#L1110
 #[test]
 fn parse_invalid_empty_string() {
     assert_eq!(
@@ -274,6 +294,7 @@ fn parse_invalid_empty_string() {
     );
 }
 
+// TimeSpanTests.cs#L1111
 #[test]
 fn parse_invalid_lone_minus() {
     assert_eq!(
@@ -284,6 +305,7 @@ fn parse_invalid_lone_minus() {
     );
 }
 
+// TimeSpanTests.cs#L1112
 #[test]
 fn parse_invalid_garbage() {
     assert_eq!(
@@ -294,6 +316,7 @@ fn parse_invalid_garbage() {
     );
 }
 
+// TimeSpanTests.cs#L1113
 #[test]
 fn parse_invalid_date_like_string() {
     assert_eq!(
@@ -304,6 +327,7 @@ fn parse_invalid_date_like_string() {
     );
 }
 
+// TimeSpanTests.cs#L1114
 #[test]
 fn parse_invalid_trailing_colon() {
     assert_eq!(
@@ -314,6 +338,7 @@ fn parse_invalid_trailing_colon() {
     );
 }
 
+// TimeSpanTests.cs#L1115
 #[test]
 fn parse_invalid_negative_component() {
     assert_eq!(
@@ -324,6 +349,7 @@ fn parse_invalid_negative_component() {
     );
 }
 
+// TimeSpanTests.cs#L1116-1118
 #[test]
 fn parse_invalid_embedded_null_chars() {
     assert_eq!(
@@ -340,6 +366,7 @@ fn parse_invalid_embedded_null_chars() {
     );
 }
 
+// TimeSpanTests.cs#L1119
 #[test]
 fn parse_invalid_double_colon() {
     assert_eq!(
@@ -350,6 +377,7 @@ fn parse_invalid_double_colon() {
     );
 }
 
+// TimeSpanTests.cs#L1120
 #[test]
 fn parse_invalid_trailing_colon_after_seconds() {
     assert_eq!(
@@ -360,6 +388,7 @@ fn parse_invalid_trailing_colon_after_seconds() {
     );
 }
 
+// TimeSpanTests.cs#L1121
 #[test]
 fn parse_invalid_too_many_components() {
     assert_eq!(
@@ -372,6 +401,7 @@ fn parse_invalid_too_many_components() {
     );
 }
 
+// TimeSpanTests.cs#L1124
 #[test]
 fn parse_invalid_wrong_decimal_separator_for_culture() {
     // hr-HR expects comma; period is invalid
@@ -391,6 +421,7 @@ fn parse_invalid_wrong_decimal_separator_for_culture() {
 // are accepted when they have enough leading zeros that the significant value fits in 7 digits;
 // the value is rounded to the nearest tick. Fractions with no leading zeros and > 7 digits
 // overflow because their integer value exceeds MaxFraction (9_999_999).
+// TimeSpanTests.cs#L1127
 #[test]
 fn parse_overflow_too_many_fractional_digits() {
     // No leading zeros: value (99999999) > MaxFraction → Overflow
@@ -412,6 +443,7 @@ fn parse_frac_leading_zeros_beyond_7_rounds_to_nearest_tick() {
     assert_eq!(TimeSpan::parse("0:0:0.000000000").unwrap().ticks(), 0);
 }
 
+// TimeSpanTests.cs#L1129-1132
 #[test]
 fn parse_overflow_days_exceed_max() {
     assert_eq!(
@@ -440,6 +472,7 @@ fn parse_overflow_days_exceed_max() {
     );
 }
 
+// TimeSpanTests.cs#L1133-1138
 #[test]
 fn parse_overflow_exceeds_max_value() {
     assert_eq!(
@@ -492,6 +525,7 @@ fn parse_overflow_exceeds_max_value() {
     );
 }
 
+// TimeSpanTests.cs#L1139-1140
 #[test]
 fn parse_overflow_seconds_or_minutes_out_of_range() {
     assert_eq!(
@@ -508,6 +542,7 @@ fn parse_overflow_seconds_or_minutes_out_of_range() {
     );
 }
 
+// TimeSpanTests.cs#L1141
 #[test]
 fn parse_overflow_ambiguous_hour_colon() {
     // "24:00" is ambiguous — treated as hours exceeding max per-component range
