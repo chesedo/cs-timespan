@@ -144,13 +144,37 @@ impl std::fmt::Display for FromFloatError {
 
 impl std::error::Error for FromFloatError {}
 
+/// Error returned when constructing a [`TimeSpan`] from integer units overflows
+/// the range representable by `TimeSpan`.
+///
+/// Mirrors the `ArgumentOutOfRangeException` thrown by C#'s `TimeSpan.FromDays(int)`
+/// (and the other integer `From*` factories).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeSpanOverflow;
+
+impl std::fmt::Display for TimeSpanOverflow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("value is outside the range representable by TimeSpan")
+    }
+}
+
+impl std::error::Error for TimeSpanOverflow {}
+
 impl TimeSpan {
     // ── Tick-unit constants ────────────────────────────────────────────────────
+    pub const TICKS_PER_MICROSECOND: i64 = 10;
     pub const TICKS_PER_MILLISECOND: i64 = 10_000;
     pub const TICKS_PER_SECOND: i64 = 10_000_000;
     pub const TICKS_PER_MINUTE: i64 = 600_000_000;
     pub const TICKS_PER_HOUR: i64 = 36_000_000_000;
     pub const TICKS_PER_DAY: i64 = 864_000_000_000;
+
+    // Microsecond-unit constants, used only by TimeSpanBuilder's overflow-safe sum.
+    const MICROSECONDS_PER_MILLISECOND: i128 = 1_000;
+    const MICROSECONDS_PER_SECOND: i128 = 1_000_000;
+    const MICROSECONDS_PER_MINUTE: i128 = 60_000_000;
+    const MICROSECONDS_PER_HOUR: i128 = 3_600_000_000;
+    const MICROSECONDS_PER_DAY: i128 = 86_400_000_000;
 
     // ── Boundary constants ─────────────────────────────────────────────────────
     pub const ZERO: TimeSpan = TimeSpan { ticks: 0 };
@@ -282,6 +306,77 @@ impl TimeSpan {
         Self::interval(value, 10.0)
     }
 
+    // ── Integer factory methods (mirror FromDays(int) / FromHours(int) / ...) ──
+    /// Creates a `TimeSpan` from an exact number of days.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_days(days: i32) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().days(days).build()
+    }
+
+    /// Creates a `TimeSpan` from an exact number of hours.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_hours(hours: i32) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().hours(hours).build()
+    }
+
+    /// Creates a `TimeSpan` from an exact number of minutes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_minutes(minutes: i64) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().minutes(minutes).build()
+    }
+
+    /// Creates a `TimeSpan` from an exact number of seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_seconds(seconds: i64) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().seconds(seconds).build()
+    }
+
+    /// Creates a `TimeSpan` from an exact number of milliseconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_milliseconds(milliseconds: i64) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().milliseconds(milliseconds).build()
+    }
+
+    /// Creates a `TimeSpan` from an exact number of microseconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    pub fn from_microseconds(microseconds: i64) -> Result<Self, TimeSpanOverflow> {
+        Self::builder().microseconds(microseconds).build()
+    }
+
+    /// Starts a [`TimeSpanBuilder`] for constructing a `TimeSpan` from a
+    /// combination of days, hours, minutes, seconds, milliseconds, and
+    /// microseconds. Mirrors C#'s multi-parameter `FromDays`/`FromHours`/...
+    /// overloads, which Rust has no direct equivalent for (no default arguments).
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().days(1).hours(2).minutes(30).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_DAY + 2 * TimeSpan::TICKS_PER_HOUR + 30 * TimeSpan::TICKS_PER_MINUTE));
+    /// ```
+    #[must_use]
+    pub fn builder() -> TimeSpanBuilder {
+        TimeSpanBuilder::default()
+    }
+
     // ── Component properties (mirror Days / Hours / Minutes / ...) ────────────
     /// Returns the whole-day component of the time interval.
     ///
@@ -322,7 +417,7 @@ impl TimeSpan {
     /// Returns the microseconds component (-999 to 999) of the time interval.
     #[must_use]
     pub const fn microseconds(self) -> i32 {
-        (self.ticks / 10 % 1000) as i32
+        (self.ticks / Self::TICKS_PER_MICROSECOND % 1000) as i32
     }
 
     /// Returns the nanoseconds component (-900 to 900, in multiples of 100) of the time interval.
@@ -374,7 +469,7 @@ impl TimeSpan {
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_microseconds(self) -> f64 {
-        self.ticks as f64 / 10.0
+        self.ticks as f64 / Self::TICKS_PER_MICROSECOND as f64
     }
 
     /// Returns the total number of nanoseconds, as a fractional value.
@@ -594,6 +689,93 @@ impl TimeSpan {
         locale: Locale,
     ) -> Result<String, FormatError> {
         fmt::format_timespan(self.ticks, fmt, decimal_sep(locale))
+    }
+}
+
+/// Builds a [`TimeSpan`] from a combination of days, hours, minutes, seconds,
+/// milliseconds, and microseconds. Created via [`TimeSpan::builder`].
+///
+/// Unset fields default to zero, mirroring C#'s optional trailing parameters
+/// on the multi-parameter `FromDays`/`FromHours`/`FromMinutes`/`FromSeconds`/
+/// `FromMilliseconds` overloads.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TimeSpanBuilder {
+    days: i32,
+    hours: i32,
+    minutes: i64,
+    seconds: i64,
+    milliseconds: i64,
+    microseconds: i64,
+}
+
+impl TimeSpanBuilder {
+    /// Sets the number of days.
+    #[must_use]
+    pub fn days(mut self, days: i32) -> Self {
+        self.days = days;
+        self
+    }
+
+    /// Sets the number of hours.
+    #[must_use]
+    pub fn hours(mut self, hours: i32) -> Self {
+        self.hours = hours;
+        self
+    }
+
+    /// Sets the number of minutes.
+    #[must_use]
+    pub fn minutes(mut self, minutes: i64) -> Self {
+        self.minutes = minutes;
+        self
+    }
+
+    /// Sets the number of seconds.
+    #[must_use]
+    pub fn seconds(mut self, seconds: i64) -> Self {
+        self.seconds = seconds;
+        self
+    }
+
+    /// Sets the number of milliseconds.
+    #[must_use]
+    pub fn milliseconds(mut self, milliseconds: i64) -> Self {
+        self.milliseconds = milliseconds;
+        self
+    }
+
+    /// Sets the number of microseconds.
+    #[must_use]
+    pub fn microseconds(mut self, microseconds: i64) -> Self {
+        self.microseconds = microseconds;
+        self
+    }
+
+    /// Combines the fields into a `TimeSpan`, summing via microseconds (matching
+    /// C#'s `Int128`-based accumulation) to avoid intermediate overflow before
+    /// the final bounds check against `TimeSpan`'s representable range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] if the combined value is outside the
+    /// representable range.
+    #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
+    pub fn build(self) -> Result<TimeSpan, TimeSpanOverflow> {
+        let total_microseconds: i128 = i128::from(self.days) * TimeSpan::MICROSECONDS_PER_DAY
+            + i128::from(self.hours) * TimeSpan::MICROSECONDS_PER_HOUR
+            + i128::from(self.minutes) * TimeSpan::MICROSECONDS_PER_MINUTE
+            + i128::from(self.seconds) * TimeSpan::MICROSECONDS_PER_SECOND
+            + i128::from(self.milliseconds) * TimeSpan::MICROSECONDS_PER_MILLISECOND
+            + i128::from(self.microseconds);
+
+        let max_microseconds = i128::from(i64::MAX) / i128::from(TimeSpan::TICKS_PER_MICROSECOND);
+        let min_microseconds = i128::from(i64::MIN) / i128::from(TimeSpan::TICKS_PER_MICROSECOND);
+        if total_microseconds > max_microseconds || total_microseconds < min_microseconds {
+            return Err(TimeSpanOverflow);
+        }
+
+        let ticks = (total_microseconds * i128::from(TimeSpan::TICKS_PER_MICROSECOND)) as i64;
+        Ok(TimeSpan::from_ticks(ticks))
     }
 }
 
