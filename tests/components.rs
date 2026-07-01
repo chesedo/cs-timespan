@@ -1,6 +1,8 @@
 use cs_timespan::TimeSpan;
 
 // ── Positive values ────────────────────────────────────────────────────────────
+// Exercises the Days/Hours/Minutes/Seconds/Milliseconds/Microseconds/Nanoseconds
+// properties: TimeSpan.cs#L310-336
 
 #[test]
 fn positive_components() {
