@@ -184,10 +184,14 @@ impl TimeSpan {
     }
 
     // ── Float factory methods (mirror FromDays(double) / FromHours(double) / ...) ──
+    // Named with an _f64 suffix (rather than plain from_days/from_hours/...) to avoid
+    // clashing with the integer factories of the same conceptual name added separately
+    // -- Rust has no overloading. Matches std::time::Duration's own from_secs/
+    // from_secs_f64 precedent for the same integer-vs-float split.
     // i64::MAX rounds up to 2^63 when cast to f64 (i64::MIN is exact, being a power of
     // two); harmless here since it only widens the boundary check, and the saturating
     // "as i64" cast below still clamps to the correct value at that boundary (see
-    // from_days_max_value_boundary/from_days_min_value_boundary tests).
+    // from_days_f64_max_value_boundary/from_days_f64_min_value_boundary tests).
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
     fn interval(value: f64, scale: f64) -> Result<Self, FromFloatError> {
@@ -208,7 +212,7 @@ impl TimeSpan {
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)] // TICKS_PER_DAY magnitude fits f64's mantissa
-    pub fn from_days(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_days_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, Self::TICKS_PER_DAY as f64)
     }
 
@@ -219,7 +223,7 @@ impl TimeSpan {
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_hours(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_hours_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, Self::TICKS_PER_HOUR as f64)
     }
 
@@ -230,7 +234,7 @@ impl TimeSpan {
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_minutes(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_minutes_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, Self::TICKS_PER_MINUTE as f64)
     }
 
@@ -241,7 +245,7 @@ impl TimeSpan {
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_seconds(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_seconds_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, Self::TICKS_PER_SECOND as f64)
     }
 
@@ -252,7 +256,7 @@ impl TimeSpan {
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_milliseconds(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_milliseconds_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, Self::TICKS_PER_MILLISECOND as f64)
     }
 
@@ -262,7 +266,7 @@ impl TimeSpan {
     ///
     /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
     /// [`FromFloatError::Overflow`] if it's outside the representable range.
-    pub fn from_microseconds(value: f64) -> Result<Self, FromFloatError> {
+    pub fn from_microseconds_f64(value: f64) -> Result<Self, FromFloatError> {
         Self::interval(value, 10.0)
     }
 
