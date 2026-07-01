@@ -1,4 +1,4 @@
-use cs_timespan::{FromFloatError, TimeSpan};
+use cs_timespan::{FloatError, TimeSpan};
 
 // ── FromDays(double) ──────────────────────────────────────────────────────────
 // TimeSpanTests.cs#L771-787
@@ -37,18 +37,15 @@ fn from_days_f64_test_data() {
 fn from_days_f64_invalid() {
     assert_eq!(
         TimeSpan::from_days_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_days_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(TimeSpan::from_days_f64(1e18), Err(FromFloatError::Overflow));
-    assert_eq!(
-        TimeSpan::from_days_f64(-1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(TimeSpan::from_days_f64(f64::NAN), Err(FromFloatError::Nan));
+    assert_eq!(TimeSpan::from_days_f64(1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_days_f64(-1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_days_f64(f64::NAN), Err(FloatError::Nan));
 }
 
 // ── FromHours(double) ─────────────────────────────────────────────────────────
@@ -88,21 +85,15 @@ fn from_hours_f64_test_data() {
 fn from_hours_f64_invalid() {
     assert_eq!(
         TimeSpan::from_hours_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_hours_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(
-        TimeSpan::from_hours_f64(1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(
-        TimeSpan::from_hours_f64(-1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(TimeSpan::from_hours_f64(f64::NAN), Err(FromFloatError::Nan));
+    assert_eq!(TimeSpan::from_hours_f64(1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_hours_f64(-1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_hours_f64(f64::NAN), Err(FloatError::Nan));
 }
 
 // ── FromMinutes(double) ───────────────────────────────────────────────────────
@@ -142,24 +133,15 @@ fn from_minutes_f64_test_data() {
 fn from_minutes_f64_invalid() {
     assert_eq!(
         TimeSpan::from_minutes_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_minutes_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(
-        TimeSpan::from_minutes_f64(1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(
-        TimeSpan::from_minutes_f64(-1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(
-        TimeSpan::from_minutes_f64(f64::NAN),
-        Err(FromFloatError::Nan)
-    );
+    assert_eq!(TimeSpan::from_minutes_f64(1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_minutes_f64(-1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_minutes_f64(f64::NAN), Err(FloatError::Nan));
 }
 
 // ── FromSeconds(double) ───────────────────────────────────────────────────────
@@ -193,24 +175,15 @@ fn from_seconds_f64_test_data() {
 fn from_seconds_f64_invalid() {
     assert_eq!(
         TimeSpan::from_seconds_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_seconds_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
-    assert_eq!(
-        TimeSpan::from_seconds_f64(1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(
-        TimeSpan::from_seconds_f64(-1e18),
-        Err(FromFloatError::Overflow)
-    );
-    assert_eq!(
-        TimeSpan::from_seconds_f64(f64::NAN),
-        Err(FromFloatError::Nan)
-    );
+    assert_eq!(TimeSpan::from_seconds_f64(1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_seconds_f64(-1e18), Err(FloatError::Overflow));
+    assert_eq!(TimeSpan::from_seconds_f64(f64::NAN), Err(FloatError::Nan));
 }
 
 // ── FromMilliseconds(double) ──────────────────────────────────────────────────
@@ -253,23 +226,23 @@ fn from_milliseconds_f64_test_data() {
 fn from_milliseconds_f64_invalid() {
     assert_eq!(
         TimeSpan::from_milliseconds_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_milliseconds_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_milliseconds_f64(1e18),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_milliseconds_f64(-1e18),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_milliseconds_f64(f64::NAN),
-        Err(FromFloatError::Nan)
+        Err(FloatError::Nan)
     );
 }
 
@@ -291,23 +264,23 @@ fn from_microseconds_f64_basic() {
     assert_eq!(TimeSpan::from_microseconds_f64(-2.55).unwrap().ticks(), -25);
     assert_eq!(
         TimeSpan::from_microseconds_f64(f64::NAN),
-        Err(FromFloatError::Nan)
+        Err(FloatError::Nan)
     );
     assert_eq!(
         TimeSpan::from_microseconds_f64(f64::INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_microseconds_f64(f64::NEG_INFINITY),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_microseconds_f64(1e18),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
     assert_eq!(
         TimeSpan::from_microseconds_f64(-1e18),
-        Err(FromFloatError::Overflow)
+        Err(FloatError::Overflow)
     );
 }
 
