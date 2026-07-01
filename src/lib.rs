@@ -151,6 +151,56 @@ impl TimeSpan {
         self.ticks
     }
 
+    // ── Component properties (mirror Days / Hours / Minutes / ...) ────────────
+    /// Returns the whole-day component of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().days(), 1);
+    /// ```
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)] // ticks / TICKS_PER_DAY always fits i32
+    pub const fn days(self) -> i32 {
+        (self.ticks / Self::TICKS_PER_DAY) as i32
+    }
+
+    /// Returns the hours component (-23 to 23) of the time interval.
+    #[must_use]
+    pub const fn hours(self) -> i32 {
+        (self.ticks / Self::TICKS_PER_HOUR % 24) as i32
+    }
+
+    /// Returns the minutes component (-59 to 59) of the time interval.
+    #[must_use]
+    pub const fn minutes(self) -> i32 {
+        (self.ticks / Self::TICKS_PER_MINUTE % 60) as i32
+    }
+
+    /// Returns the seconds component (-59 to 59) of the time interval.
+    #[must_use]
+    pub const fn seconds(self) -> i32 {
+        (self.ticks / Self::TICKS_PER_SECOND % 60) as i32
+    }
+
+    /// Returns the milliseconds component (-999 to 999) of the time interval.
+    #[must_use]
+    pub const fn milliseconds(self) -> i32 {
+        (self.ticks / Self::TICKS_PER_MILLISECOND % 1000) as i32
+    }
+
+    /// Returns the microseconds component (-999 to 999) of the time interval.
+    #[must_use]
+    pub const fn microseconds(self) -> i32 {
+        (self.ticks / 10 % 1000) as i32
+    }
+
+    /// Returns the nanoseconds component (-900 to 900, in multiples of 100) of the time interval.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)] // (ticks % 10) * 100 is at most 900
+    pub const fn nanoseconds(self) -> i32 {
+        (self.ticks % 10 * 100) as i32
+    }
+
     // ── Lenient parsing (mirrors Parse / TryParse) ─────────────────────────────
     /// Parses a time interval string using the invariant culture (`.` decimal separator).
     ///
