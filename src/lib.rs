@@ -147,8 +147,8 @@ impl std::error::Error for FromFloatError {}
 /// Error returned when constructing a [`TimeSpan`] from integer units overflows
 /// the range representable by `TimeSpan`.
 ///
-/// Mirrors the `ArgumentOutOfRangeException` C#'s `TimeSpan.FromDays` (and the
-/// other integer `From*` factories) throws.
+/// Mirrors the `ArgumentOutOfRangeException` thrown by C#'s `TimeSpan.FromDays(int)`
+/// (and the other integer `From*` factories).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeSpanOverflow;
 
@@ -313,10 +313,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_days(days: i32) -> Result<Self, TimeSpanOverflow> {
-        i64::from(days)
-            .checked_mul(Self::TICKS_PER_DAY)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().days(days).build()
     }
 
     /// Creates a `TimeSpan` from an exact number of hours.
@@ -325,10 +322,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_hours(hours: i32) -> Result<Self, TimeSpanOverflow> {
-        i64::from(hours)
-            .checked_mul(Self::TICKS_PER_HOUR)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().hours(hours).build()
     }
 
     /// Creates a `TimeSpan` from an exact number of minutes.
@@ -337,10 +331,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_minutes(minutes: i64) -> Result<Self, TimeSpanOverflow> {
-        minutes
-            .checked_mul(Self::TICKS_PER_MINUTE)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().minutes(minutes).build()
     }
 
     /// Creates a `TimeSpan` from an exact number of seconds.
@@ -349,10 +340,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_seconds(seconds: i64) -> Result<Self, TimeSpanOverflow> {
-        seconds
-            .checked_mul(Self::TICKS_PER_SECOND)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().seconds(seconds).build()
     }
 
     /// Creates a `TimeSpan` from an exact number of milliseconds.
@@ -361,10 +349,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_milliseconds(milliseconds: i64) -> Result<Self, TimeSpanOverflow> {
-        milliseconds
-            .checked_mul(Self::TICKS_PER_MILLISECOND)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().milliseconds(milliseconds).build()
     }
 
     /// Creates a `TimeSpan` from an exact number of microseconds.
@@ -373,10 +358,7 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
     pub fn from_microseconds(microseconds: i64) -> Result<Self, TimeSpanOverflow> {
-        microseconds
-            .checked_mul(Self::TICKS_PER_MICROSECOND)
-            .map(Self::from_ticks)
-            .ok_or(TimeSpanOverflow)
+        Self::builder().microseconds(microseconds).build()
     }
 
     /// Starts a [`TimeSpanBuilder`] for constructing a `TimeSpan` from a

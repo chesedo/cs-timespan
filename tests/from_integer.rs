@@ -118,7 +118,10 @@ fn from_days_int_should_construct_max_value_approximation() {
         .unwrap();
     // Should be within TicksPerMicrosecond (10) ticks of expected
     let diff_ticks = expected.ticks() - actual.ticks();
-    assert!(diff_ticks.abs() < 10, "Diff ticks was {diff_ticks}");
+    assert!(
+        diff_ticks.abs() < TimeSpan::TICKS_PER_MICROSECOND,
+        "Diff ticks was {diff_ticks}"
+    );
 }
 
 // TimeSpanTests.cs#L397-405
@@ -135,7 +138,10 @@ fn from_days_int_should_construct_min_value_approximation() {
         .build()
         .unwrap();
     let diff_ticks = actual.ticks() - expected.ticks();
-    assert!(diff_ticks.abs() < 10, "Diff ticks was {diff_ticks}");
+    assert!(
+        diff_ticks.abs() < TimeSpan::TICKS_PER_MICROSECOND,
+        "Diff ticks was {diff_ticks}"
+    );
 }
 
 // Full parity with TimeSpanTests.cs#L415-453 (FromDays_Int_ShouldOverflowOrUnderflow_Data +
