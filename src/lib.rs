@@ -134,7 +134,6 @@ impl TimeSpan {
 
     // Mirrors C#'s MinMilliseconds/MaxMilliseconds: i64::MIN/MAX ticks converted
     // to whole milliseconds, used to clamp total_milliseconds() below.
-    // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs#L213-L214
     #[allow(clippy::cast_precision_loss)] // exact: magnitude fits f64's mantissa
     const MIN_MILLISECONDS: f64 = (i64::MIN / Self::TICKS_PER_MILLISECOND) as f64;
     #[allow(clippy::cast_precision_loss)]
@@ -160,14 +159,12 @@ impl TimeSpan {
     }
 
     // ── Component properties (mirror Days / Hours / Minutes / ...) ────────────
-    // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs#L310-L336
     /// Returns the whole-day component of the time interval.
     ///
     /// ```
     /// use cs_timespan::TimeSpan;
     /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().days(), 1);
     /// ```
-    // TimeSpan.cs#L310
     #[must_use]
     #[allow(clippy::cast_possible_truncation)] // ticks / TICKS_PER_DAY always fits i32
     pub const fn days(self) -> i32 {
@@ -175,42 +172,36 @@ impl TimeSpan {
     }
 
     /// Returns the hours component (-23 to 23) of the time interval.
-    // TimeSpan.cs#L312
     #[must_use]
     pub const fn hours(self) -> i32 {
         (self.ticks / Self::TICKS_PER_HOUR % 24) as i32
     }
 
     /// Returns the minutes component (-59 to 59) of the time interval.
-    // TimeSpan.cs#L334
     #[must_use]
     pub const fn minutes(self) -> i32 {
         (self.ticks / Self::TICKS_PER_MINUTE % 60) as i32
     }
 
     /// Returns the seconds component (-59 to 59) of the time interval.
-    // TimeSpan.cs#L336
     #[must_use]
     pub const fn seconds(self) -> i32 {
         (self.ticks / Self::TICKS_PER_SECOND % 60) as i32
     }
 
     /// Returns the milliseconds component (-999 to 999) of the time interval.
-    // TimeSpan.cs#L314
     #[must_use]
     pub const fn milliseconds(self) -> i32 {
         (self.ticks / Self::TICKS_PER_MILLISECOND % 1000) as i32
     }
 
     /// Returns the microseconds component (-999 to 999) of the time interval.
-    // TimeSpan.cs#L323
     #[must_use]
     pub const fn microseconds(self) -> i32 {
         (self.ticks / 10 % 1000) as i32
     }
 
     /// Returns the nanoseconds component (-900 to 900, in multiples of 100) of the time interval.
-    // TimeSpan.cs#L332
     #[must_use]
     #[allow(clippy::cast_possible_truncation)] // (ticks % 10) * 100 is at most 900
     pub const fn nanoseconds(self) -> i32 {
@@ -218,9 +209,7 @@ impl TimeSpan {
     }
 
     // ── Total properties (mirror TotalDays / TotalHours / ...) ────────────────
-    // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs#L338-L387
     /// Returns the total number of days, as a fractional value.
-    // TimeSpan.cs#L338
     #[must_use]
     #[allow(clippy::cast_precision_loss)] // matches C#'s (double)_ticks precision loss
     pub fn total_days(self) -> f64 {
@@ -228,7 +217,6 @@ impl TimeSpan {
     }
 
     /// Returns the total number of hours, as a fractional value.
-    // TimeSpan.cs#L340
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_hours(self) -> f64 {
@@ -236,7 +224,6 @@ impl TimeSpan {
     }
 
     /// Returns the total number of minutes, as a fractional value.
-    // TimeSpan.cs#L385
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_minutes(self) -> f64 {
@@ -244,7 +231,6 @@ impl TimeSpan {
     }
 
     /// Returns the total number of seconds, as a fractional value.
-    // TimeSpan.cs#L387
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_seconds(self) -> f64 {
@@ -253,8 +239,6 @@ impl TimeSpan {
 
     /// Returns the total number of milliseconds, as a fractional value, clamped
     /// to the range representable by `i64::MIN`/`i64::MAX` ticks.
-    // TimeSpan.cs#L342-L355 (the clamp guards against (double)_ticks rounding
-    // past the true i64-derived boundary for MIN_VALUE/MAX_VALUE)
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_milliseconds(self) -> f64 {
@@ -263,7 +247,6 @@ impl TimeSpan {
     }
 
     /// Returns the total number of microseconds, as a fractional value.
-    // TimeSpan.cs#L371
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_microseconds(self) -> f64 {
@@ -271,7 +254,6 @@ impl TimeSpan {
     }
 
     /// Returns the total number of nanoseconds, as a fractional value.
-    // TimeSpan.cs#L383
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_nanoseconds(self) -> f64 {

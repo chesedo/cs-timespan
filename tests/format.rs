@@ -1,7 +1,7 @@
 // Tests ported from the C# reference implementation:
-// https://github.com/dotnet/corefx/blob/master/src/System.Runtime/tests/System/TimeSpanTests.cs
+// https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs
 //
-// C# test method covered here: ToString_TestData
+// C# test method covered here: ToString_TestData (TimeSpanTests.cs#L1539-1654)
 //
 // Notes on translation:
 // - C# `new TimeSpan(h, m, s)`        → `hms(h, m, s)`
@@ -47,11 +47,13 @@ fn input() -> TimeSpan {
 
 // ── Custom single-component specifiers (%d, %h, %m, %s, %f/%F families) ──────
 
+// TimeSpanTests.cs#L1546
 #[test]
 fn format_custom_percent_d() {
     assert_eq!(input().to_string_fmt("%d").unwrap(), "142");
 }
 
+// TimeSpanTests.cs#L1547
 #[test]
 fn format_custom_dd() {
     assert_eq!(input().to_string_fmt("dd").unwrap(), "142");
@@ -113,10 +115,10 @@ fn format_custom_invalid_frac_repeat_too_long() {
     );
 }
 
+// TimeSpanFormat.cs#L409-419 (the '%' case) recurses into FormatCustomized with
+// just 'x'; 'x' hits the default case at TimeSpanFormat.cs#L449-451 which throws.
 #[test]
 fn format_custom_percent_unknown_specifier() {
-    // C# TimeSpanFormat.cs FormatCustomized line ~419: %x recurses into FormatCustomized
-    // with just 'x'; 'x' hits the default case (line ~451) which throws FormatException.
     assert_eq!(
         input().to_string_fmt("%x").unwrap_err().to_string(),
         r#"unrecognised specifier 'x'; valid specifiers: d h m s f F
@@ -125,36 +127,43 @@ fn format_custom_percent_unknown_specifier() {
     );
 }
 
+// TimeSpanTests.cs#L1548
 #[test]
 fn format_custom_percent_h() {
     assert_eq!(input().to_string_fmt("%h").unwrap(), "21");
 }
 
+// TimeSpanTests.cs#L1549
 #[test]
 fn format_custom_hh() {
     assert_eq!(input().to_string_fmt("hh").unwrap(), "21");
 }
 
+// TimeSpanTests.cs#L1550
 #[test]
 fn format_custom_percent_m() {
     assert_eq!(input().to_string_fmt("%m").unwrap(), "21");
 }
 
+// TimeSpanTests.cs#L1551
 #[test]
 fn format_custom_mm() {
     assert_eq!(input().to_string_fmt("mm").unwrap(), "21");
 }
 
+// TimeSpanTests.cs#L1552
 #[test]
 fn format_custom_percent_s() {
     assert_eq!(input().to_string_fmt("%s").unwrap(), "18");
 }
 
+// TimeSpanTests.cs#L1553
 #[test]
 fn format_custom_ss() {
     assert_eq!(input().to_string_fmt("ss").unwrap(), "18");
 }
 
+// TimeSpanTests.cs#L1554-1560
 #[test]
 fn format_custom_fractional_lowercase_f() {
     // Lowercase f* always emits exactly N digits (no trailing-zero trimming)
@@ -167,6 +176,7 @@ fn format_custom_fractional_lowercase_f() {
     assert_eq!(input().to_string_fmt("fffffff").unwrap(), "9101112");
 }
 
+// TimeSpanTests.cs#L1561-1567
 #[test]
 fn format_custom_fractional_uppercase_f() {
     // Uppercase F* trims trailing zeros
@@ -179,6 +189,7 @@ fn format_custom_fractional_uppercase_f() {
     assert_eq!(input().to_string_fmt("FFFFFFF").unwrap(), "9101112");
 }
 
+// TimeSpanTests.cs#L1568
 #[test]
 fn format_custom_composite_dd_dot_ss() {
     // Escape sequences: \. is a literal dot
@@ -198,6 +209,7 @@ fn format_custom_backslash_escape_inside_quote() {
     );
 }
 
+// TimeSpanTests.cs#L1569
 #[test]
 fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     // Custom format specifiers are not culture-sensitive
@@ -212,6 +224,7 @@ fn format_custom_composite_dd_dot_ss_is_culture_invariant() {
     }
 }
 
+// TimeSpanTests.cs#L1570
 #[test]
 fn format_custom_dddddd_dot_ss() {
     assert_eq!(input().to_string_fmt(r"dddddd\.ss").unwrap(), "000142.18");
@@ -220,7 +233,10 @@ fn format_custom_dddddd_dot_ss() {
 // ── Standard format "c" / "t" / "T" (constant, culture-invariant) ─────────────
 //
 // All three produce identical output; culture is ignored.
+// The tests below each duplicate one row of the constFormat loop body at
+// TimeSpanTests.cs#L1578-1589.
 
+// TimeSpanTests.cs#L1578
 #[test]
 fn format_constant_large_value() {
     for fmt in ["c", "t", "T"] {
@@ -232,6 +248,7 @@ fn format_constant_large_value() {
     }
 }
 
+// TimeSpanTests.cs#L1579
 #[test]
 fn format_constant_zero() {
     for fmt in ["c", "t", "T"] {
@@ -243,6 +260,7 @@ fn format_constant_zero() {
     }
 }
 
+// TimeSpanTests.cs#L1580
 #[test]
 fn format_constant_one_tick() {
     for fmt in ["c", "t", "T"] {
@@ -254,6 +272,7 @@ fn format_constant_one_tick() {
     }
 }
 
+// TimeSpanTests.cs#L1581
 #[test]
 fn format_constant_minus_one_tick() {
     for fmt in ["c", "t", "T"] {
@@ -265,6 +284,7 @@ fn format_constant_minus_one_tick() {
     }
 }
 
+// TimeSpanTests.cs#L1582
 #[test]
 fn format_constant_max_value() {
     for fmt in ["c", "t", "T"] {
@@ -276,6 +296,7 @@ fn format_constant_max_value() {
     }
 }
 
+// TimeSpanTests.cs#L1583
 #[test]
 fn format_constant_min_value() {
     for fmt in ["c", "t", "T"] {
@@ -287,6 +308,7 @@ fn format_constant_min_value() {
     }
 }
 
+// TimeSpanTests.cs#L1584-1586
 #[test]
 fn format_constant_hms() {
     for fmt in ["c", "t", "T"] {
@@ -308,6 +330,7 @@ fn format_constant_hms() {
     }
 }
 
+// TimeSpanTests.cs#L1587
 #[test]
 fn format_constant_dhms_overflow_hours() {
     // 12 days + 34 hours normalises to 13 days 10 hours
@@ -320,6 +343,7 @@ fn format_constant_dhms_overflow_hours() {
     }
 }
 
+// TimeSpanTests.cs#L1588-1589
 #[test]
 fn format_constant_dhmsm() {
     for fmt in ["c", "t", "T"] {
@@ -336,6 +360,7 @@ fn format_constant_dhmsm() {
     }
 }
 
+// TimeSpanTests.cs#L1573 (the constFormat/cultureInfos loop nest itself)
 #[test]
 fn format_constant_is_culture_invariant() {
     // "c"/"t"/"T" output must not change with culture
@@ -352,6 +377,7 @@ fn format_constant_is_culture_invariant() {
 
 // ── Display (equivalent to C# null format, which also uses "c") ───────────────
 
+// TimeSpanTests.cs#L1576-1583 (the null-format case of the constFormat loop)
 #[test]
 fn format_display_equals_c_format() {
     assert_eq!(input().to_string(), input().to_string_fmt("c").unwrap());
@@ -365,6 +391,7 @@ fn format_display_equals_c_format() {
 
 // ── Standard format "g" (general short, culture-sensitive) ────────────────────
 
+// TimeSpanTests.cs#L1594
 #[test]
 fn format_g_invariant_large_value() {
     assert_eq!(
@@ -373,6 +400,7 @@ fn format_g_invariant_large_value() {
     );
 }
 
+// TimeSpanTests.cs#L1595-1605
 #[test]
 fn format_g_invariant_common_values() {
     let cases: &[(TimeSpan, &str)] = &[
@@ -398,6 +426,7 @@ fn format_g_invariant_common_values() {
     }
 }
 
+// TimeSpanTests.cs#L1610-1621
 #[test]
 fn format_g_fr_fr_uses_comma_separator() {
     let cases: &[(TimeSpan, &str)] = &[
@@ -426,6 +455,7 @@ fn format_g_fr_fr_uses_comma_separator() {
 
 // ── Standard format "G" (general long, culture-sensitive) ─────────────────────
 
+// TimeSpanTests.cs#L1625
 #[test]
 fn format_g_upper_invariant_large_value() {
     assert_eq!(
@@ -434,6 +464,7 @@ fn format_g_upper_invariant_large_value() {
     );
 }
 
+// TimeSpanTests.cs#L1626-1636
 #[test]
 fn format_g_upper_invariant_common_values() {
     let cases: &[(TimeSpan, &str)] = &[
@@ -459,6 +490,7 @@ fn format_g_upper_invariant_common_values() {
     }
 }
 
+// TimeSpanTests.cs#L1641-1652
 #[test]
 fn format_g_upper_fr_fr_uses_comma_separator() {
     let cases: &[(TimeSpan, &str)] = &[
@@ -485,10 +517,10 @@ fn format_g_upper_fr_fr_uses_comma_separator() {
     }
 }
 
+// TimeSpanFormat.cs#L405-408: quoted-literal dispatch calls ParseQuoteString,
+// which throws FormatException on reaching end of format without a closing quote.
 #[test]
 fn format_custom_unclosed_quote() {
-    // C# TimeSpanFormat.cs ParseQuoteString: reaching end of format without closing quote
-    // throws FormatException. Lines ~210-230.
     assert_eq!(
         input().to_string_fmt("'abc").unwrap_err().to_string(),
         r#"quoted literal is not closed
@@ -503,10 +535,9 @@ fn format_custom_unclosed_quote() {
     );
 }
 
+// TimeSpanFormat.cs#L409-430: "%%" or lone "%" at end of format throws FormatException.
 #[test]
 fn format_custom_invalid_percent() {
-    // C# TimeSpanFormat.cs FormatCustomized: "%%" or lone "%" at end throws FormatException.
-    // Lines ~180-195.
     assert_eq!(
         input().to_string_fmt("%%").unwrap_err().to_string(),
         r#"'%' must be followed by a single specifier (d h m s f F)
@@ -521,10 +552,9 @@ fn format_custom_invalid_percent() {
     );
 }
 
+// TimeSpanFormat.cs#L431-448: trailing '\' with no following char throws FormatException.
 #[test]
 fn format_custom_trailing_escape() {
-    // C# TimeSpanFormat.cs FormatCustomized: trailing '\' with no following char throws FormatException.
-    // Lines ~200-205.
     assert_eq!(
         input().to_string_fmt(r"\").unwrap_err().to_string(),
         r#"trailing '\' must be followed by a character to escape

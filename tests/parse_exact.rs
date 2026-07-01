@@ -1,7 +1,8 @@
 // Tests ported from the C# reference implementation:
-// https://github.com/dotnet/corefx/blob/master/src/System.Runtime/tests/System/TimeSpanTests.cs
+// https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs
 //
-// C# test methods covered here: ParseExact_Valid_TestData, ParseExact_Invalid_TestData
+// C# test methods covered here: ParseExact_Valid_TestData (TimeSpanTests.cs#L1162-1206),
+// ParseExact_Invalid_TestData (TimeSpanTests.cs#L1252-1304)
 //
 // Additional tests derived from the C# documentation examples:
 // - https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
@@ -42,6 +43,7 @@ fn neg(t: TimeSpan) -> TimeSpan {
 
 // ── ParseExact_Valid — constant format "c" / "t" / "T" ───────────────────────
 
+// TimeSpanTests.cs#L1167
 #[test]
 fn parse_exact_constant_format_hms() {
     for fmt in ["c", "t", "T"] {
@@ -53,6 +55,7 @@ fn parse_exact_constant_format_hms() {
     }
 }
 
+// TimeSpanTests.cs#L1168
 #[test]
 fn parse_exact_constant_format_d_dot_hms() {
     for fmt in ["c", "t", "T"] {
@@ -66,6 +69,8 @@ fn parse_exact_constant_format_d_dot_hms() {
 
 // C# TimeSpanParse.cs ParseTime (line 1384): `if (_ch == ':')` makes the second colon
 // and seconds component optional — "hh:mm" and "d.hh:mm" are valid "c" inputs.
+// (No direct ParseExact_Valid_TestData row for this reduced form; it documents
+// StringParser.ParseTime behavior rather than duplicating a specific test case.)
 #[test]
 fn parse_exact_c_hm_no_seconds() {
     for fmt in ["c", "t", "T"] {
@@ -82,6 +87,7 @@ fn parse_exact_c_hm_no_seconds() {
     }
 }
 
+// TimeSpanTests.cs#L1169
 #[test]
 fn parse_exact_constant_format_negative_with_millis() {
     for fmt in ["c", "t", "T"] {
@@ -95,11 +101,13 @@ fn parse_exact_constant_format_negative_with_millis() {
 
 // ── ParseExact_Valid — general short format "g" ───────────────────────────────
 
+// TimeSpanTests.cs#L1173
 #[test]
 fn parse_exact_g_bare_integer_is_days() {
     assert_eq!(TimeSpan::parse_exact("12", "g"), Ok(ts4(12, 0, 0, 0)));
 }
 
+// TimeSpanTests.cs#L1174
 #[test]
 fn parse_exact_g_negative_days() {
     assert_eq!(
@@ -108,11 +116,13 @@ fn parse_exact_g_negative_days() {
     );
 }
 
+// TimeSpanTests.cs#L1175
 #[test]
 fn parse_exact_g_hm() {
     assert_eq!(TimeSpan::parse_exact("12:34", "g"), Ok(ts3(12, 34, 0)));
 }
 
+// TimeSpanTests.cs#L1176
 #[test]
 fn parse_exact_g_negative_hm() {
     assert_eq!(
@@ -121,6 +131,7 @@ fn parse_exact_g_negative_hm() {
     );
 }
 
+// TimeSpanTests.cs#L1177-1178
 #[test]
 fn parse_exact_g_hm_with_fraction() {
     assert_eq!(
@@ -133,6 +144,7 @@ fn parse_exact_g_hm_with_fraction() {
     );
 }
 
+// TimeSpanTests.cs#L1179
 #[test]
 fn parse_exact_g_hms() {
     assert_eq!(
@@ -141,6 +153,7 @@ fn parse_exact_g_hms() {
     );
 }
 
+// TimeSpanTests.cs#L1180-1181
 #[test]
 fn parse_exact_g_hms_with_millis() {
     assert_eq!(
@@ -153,6 +166,7 @@ fn parse_exact_g_hms_with_millis() {
     );
 }
 
+// TimeSpanTests.cs#L1182-1183
 #[test]
 fn parse_exact_g_d_hm_with_fraction() {
     assert_eq!(
@@ -165,6 +179,7 @@ fn parse_exact_g_d_hm_with_fraction() {
     );
 }
 
+// TimeSpanTests.cs#L1184
 #[test]
 fn parse_exact_g_d_hms() {
     assert_eq!(
@@ -173,6 +188,7 @@ fn parse_exact_g_d_hms() {
     );
 }
 
+// TimeSpanTests.cs#L1185
 #[test]
 fn parse_exact_g_negative_full() {
     assert_eq!(
@@ -183,6 +199,7 @@ fn parse_exact_g_negative_full() {
 
 // ── ParseExact_Valid — general long format "G" ────────────────────────────────
 
+// TimeSpanTests.cs#L1188
 #[test]
 fn parse_exact_g_upper_d_hms_with_millis() {
     assert_eq!(
@@ -191,6 +208,7 @@ fn parse_exact_g_upper_d_hms_with_millis() {
     );
 }
 
+// TimeSpanTests.cs#L1189
 #[test]
 fn parse_exact_g_upper_negative() {
     assert_eq!(
@@ -201,6 +219,7 @@ fn parse_exact_g_upper_negative() {
 
 // ── ParseExact_Valid — custom format specifiers ───────────────────────────────
 
+// TimeSpanTests.cs#L1192
 #[test]
 fn parse_exact_custom_dd_dot_h_m_s() {
     assert_eq!(
@@ -209,6 +228,7 @@ fn parse_exact_custom_dd_dot_h_m_s() {
     );
 }
 
+// TimeSpanTests.cs#L1193
 #[test]
 fn parse_exact_custom_ddd_dot_h_m_s_fff() {
     assert_eq!(
@@ -217,6 +237,7 @@ fn parse_exact_custom_ddd_dot_h_m_s_fff() {
     );
 }
 
+// TimeSpanTests.cs#L1194
 #[test]
 fn parse_exact_custom_d_dot_hh_mm_ss() {
     assert_eq!(
@@ -225,6 +246,7 @@ fn parse_exact_custom_d_dot_hh_mm_ss() {
     );
 }
 
+// TimeSpanTests.cs#L1195
 #[test]
 fn parse_exact_custom_literal_word_backslash_escaped() {
     assert_eq!(
@@ -233,6 +255,7 @@ fn parse_exact_custom_literal_word_backslash_escaped() {
     );
 }
 
+// TimeSpanTests.cs#L1196
 #[test]
 fn parse_exact_custom_literal_word_double_quoted() {
     assert_eq!(
@@ -241,6 +264,7 @@ fn parse_exact_custom_literal_word_double_quoted() {
     );
 }
 
+// TimeSpanTests.cs#L1197
 #[test]
 fn parse_exact_custom_literal_word_single_quoted() {
     assert_eq!(
@@ -251,6 +275,9 @@ fn parse_exact_custom_literal_word_single_quoted() {
 
 // C# DateTimeParse.TryParseQuoteString (DateTimeParse.cs line 4600): '\' inside a
 // quoted literal is an escape — '\X' appends X, allowing the quote char to be embedded.
+// (No direct ParseExact_Valid_TestData row for this exact input; it exercises the
+// same quoted-literal escape mechanism as parse_exact_custom_literal_word_double_quoted
+// and parse_exact_custom_literal_word_single_quoted above.)
 #[test]
 fn parse_exact_custom_backslash_escape_inside_quote() {
     // Format: "5\:00" (double-quoted literal, '\:' inside the quote = literal ':')
@@ -263,6 +290,7 @@ fn parse_exact_custom_backslash_escape_inside_quote() {
     assert_eq!(TimeSpan::parse_exact("5's", "'5\\'s'"), Ok(ts4(0, 0, 0, 0)),);
 }
 
+// TimeSpanTests.cs#L1198
 #[test]
 fn parse_exact_custom_fff_lowercase() {
     assert_eq!(
@@ -271,6 +299,7 @@ fn parse_exact_custom_fff_lowercase() {
     );
 }
 
+// TimeSpanTests.cs#L1199
 #[test]
 fn parse_exact_custom_fff_uppercase_optional_digits() {
     assert_eq!(
@@ -281,6 +310,8 @@ fn parse_exact_custom_fff_uppercase_optional_digits() {
 
 // C# TryParseByFormat (TimeSpanParse.cs line 1317): ParseExactDigits return value is
 // ignored for 'F' specifiers — zero matched digits is valid (fraction defaults to 0).
+// (No direct ParseExact_Valid_TestData row for these exact inputs; this documents
+// TryParseByFormat behavior rather than duplicating a specific test case.)
 #[test]
 fn parse_exact_custom_uppercase_f_zero_digits_accepted() {
     // Format has fractional part but input ends after the separator — fraction = 0
@@ -294,6 +325,7 @@ fn parse_exact_custom_uppercase_f_zero_digits_accepted() {
     );
 }
 
+// TimeSpanTests.cs#L1200-1205
 #[test]
 fn parse_exact_custom_percent_specifiers() {
     assert_eq!(TimeSpan::parse_exact("3", "%d"), Ok(ts5(3, 0, 0, 0, 0)));
@@ -322,6 +354,7 @@ fn parse_exact_custom_percent_passthrough() {
 
 // ── ParseExact_Invalid — FormatException cases ────────────────────────────────
 
+// TimeSpanTests.cs#L1256
 #[test]
 fn parse_exact_invalid_empty_string() {
     assert_eq!(
@@ -332,6 +365,7 @@ fn parse_exact_invalid_empty_string() {
     );
 }
 
+// TimeSpanTests.cs#L1257
 #[test]
 fn parse_exact_invalid_lone_minus() {
     assert_eq!(
@@ -342,6 +376,7 @@ fn parse_exact_invalid_lone_minus() {
     );
 }
 
+// TimeSpanTests.cs#L1258
 #[test]
 fn parse_exact_invalid_garbage() {
     // "garbage" has 0 colons; "c" format requires exactly 2
@@ -355,6 +390,7 @@ fn parse_exact_invalid_garbage() {
     );
 }
 
+// TimeSpanTests.cs#L1266-1268
 #[test]
 fn parse_exact_invalid_wrong_separator() {
     // '?' replaces the first colon → day_hour = "1?59", no dot, hours = "1?59"
@@ -388,6 +424,7 @@ fn parse_exact_invalid_wrong_separator() {
     );
 }
 
+// TimeSpanTests.cs#L1269
 #[test]
 fn parse_exact_c_rejects_d_colon_form() {
     // "c" format uses dot separator for days; colon-separated days is only valid in "g"
@@ -401,6 +438,7 @@ fn parse_exact_c_rejects_d_colon_form() {
     );
 }
 
+// TimeSpanTests.cs#L1271
 #[test]
 fn parse_exact_g_rejects_dot_separated_days() {
     assert_eq!(
@@ -413,6 +451,7 @@ fn parse_exact_g_rejects_dot_separated_days() {
     );
 }
 
+// TimeSpanTests.cs#L1273
 #[test]
 fn parse_exact_g_upper_rejects_colon_without_fractional() {
     // "G" requires the full d:hh:mm:ss.fffffff pattern
@@ -426,6 +465,7 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
     );
 }
 
+// TimeSpanTests.cs#L1302
 #[test]
 fn parse_exact_invalid_empty_format_string() {
     assert_eq!(
@@ -457,6 +497,7 @@ fn parse_exact_invalid_single_char_custom_format() {
     );
 }
 
+// TimeSpanTests.cs#L1303
 #[test]
 fn parse_exact_invalid_unknown_format_specifier() {
     assert_eq!(
@@ -469,6 +510,7 @@ fn parse_exact_invalid_unknown_format_specifier() {
     );
 }
 
+// TimeSpanTests.cs#L1287-1288
 #[test]
 fn parse_exact_invalid_percent_not_alone() {
     assert_eq!(
@@ -485,6 +527,7 @@ fn parse_exact_invalid_percent_not_alone() {
     );
 }
 
+// TimeSpanTests.cs#L1289-1290, #L1293, #L1296-1297, #L1299
 #[test]
 fn parse_exact_invalid_repeated_specifier() {
     assert_eq!(
@@ -529,6 +572,7 @@ fn parse_exact_invalid_repeated_specifier() {
     );
 }
 
+// TimeSpanTests.cs#L1291, #L1294
 #[test]
 fn parse_exact_invalid_wrong_digit_count() {
     // Digit count mismatch causes the subsequent literal separator to not match
@@ -558,6 +602,7 @@ fn parse_exact_invalid_wrong_digit_count() {
     );
 }
 
+// TimeSpanTests.cs#L1289, #L1292, #L1295
 #[test]
 fn parse_exact_invalid_triple_specifier() {
     assert_eq!(
@@ -586,6 +631,7 @@ fn parse_exact_invalid_triple_specifier() {
     );
 }
 
+// TimeSpanTests.cs#L1279
 #[test]
 fn parse_exact_invalid_f_wrong_digit_count() {
     // "ffff" expects exactly 4 fractional digits; "678" is only 3 → input too short
@@ -599,6 +645,7 @@ fn parse_exact_invalid_f_wrong_digit_count() {
     );
 }
 
+// TimeSpanTests.cs#L1280
 #[test]
 fn parse_exact_invalid_f_uppercase_too_many_chars() {
     assert_eq!(
@@ -611,6 +658,7 @@ fn parse_exact_invalid_f_uppercase_too_many_chars() {
     );
 }
 
+// TimeSpanTests.cs#L1298
 #[test]
 fn parse_exact_invalid_d_too_many_specifiers() {
     // Max is dddddddd (8 d's)
@@ -654,6 +702,7 @@ fn parse_exact_invalid_duplicate_percent_h_specifier() {
     );
 }
 
+// TimeSpanTests.cs#L1300
 #[test]
 fn parse_exact_invalid_too_many_digits_for_dd() {
     assert_eq!(
@@ -666,6 +715,7 @@ fn parse_exact_invalid_too_many_digits_for_dd() {
     );
 }
 
+// TimeSpanTests.cs#L1301
 #[test]
 fn parse_exact_invalid_unknown_specifier_vv() {
     assert_eq!(
@@ -678,6 +728,7 @@ fn parse_exact_invalid_unknown_specifier_vv() {
     );
 }
 
+// TimeSpanTests.cs#L1283
 #[test]
 fn parse_exact_invalid_unclosed_literal_double_quote() {
     assert_eq!(
@@ -690,6 +741,7 @@ fn parse_exact_invalid_unclosed_literal_double_quote() {
     );
 }
 
+// TimeSpanTests.cs#L1284
 #[test]
 fn parse_exact_invalid_unclosed_literal_single_quote() {
     assert_eq!(
@@ -702,6 +754,7 @@ fn parse_exact_invalid_unclosed_literal_single_quote() {
     );
 }
 
+// TimeSpanTests.cs#L1285-1286
 #[test]
 fn parse_exact_invalid_literal_mismatch() {
     assert_eq!(
@@ -752,10 +805,10 @@ fn parse_exact_with_styles_assume_negative_custom_format() {
     );
 }
 
-// C# TimeSpanParse.cs `TryParseExactTimeSpan` (lines ~1228–1246 in dotnet/runtime):
-// The five standard format characters ('c'/'t'/'T'/'g'/'G') are dispatched directly
-// without forwarding `styles` to the parser — `AssumeNegative` is therefore invisible
-// to them. Only `TryParseByFormat` (custom formats) receives and acts on `styles`.
+// TimeSpanParse.cs#L1228-1247: `TryParseExactTimeSpan` dispatches the five standard
+// format characters ('c'/'t'/'T'/'g'/'G') directly without forwarding `styles` to
+// the parser — `AssumeNegative` is therefore invisible to them. Only
+// `TryParseByFormat` (custom formats) receives and acts on `styles`.
 #[test]
 fn parse_exact_with_styles_assume_negative_standard_format() {
     // AssumeNegative is silently ignored for all five standard format strings; the
@@ -841,6 +894,7 @@ fn parse_exact_c_too_many_fractional_digits() {
 
 // ── ParseExact_Invalid — OverflowException cases ──────────────────────────────
 
+// TimeSpanTests.cs#L1261
 #[test]
 fn parse_exact_overflow_hours_out_of_range() {
     assert_eq!(
@@ -853,6 +907,7 @@ fn parse_exact_overflow_hours_out_of_range() {
     );
 }
 
+// TimeSpanTests.cs#L1262, #L1265, #L1270
 #[test]
 fn parse_exact_overflow_minutes_out_of_range() {
     assert_eq!(
@@ -881,6 +936,7 @@ fn parse_exact_overflow_minutes_out_of_range() {
     );
 }
 
+// TimeSpanTests.cs#L1263
 #[test]
 fn parse_exact_overflow_seconds_out_of_range() {
     assert_eq!(
@@ -893,6 +949,7 @@ fn parse_exact_overflow_seconds_out_of_range() {
     );
 }
 
+// TimeSpanTests.cs#L1264
 #[test]
 fn parse_exact_overflow_hours_exceed_23_in_c_format() {
     // "c" format hours must be 0-23; 24 hours overflows
@@ -906,6 +963,7 @@ fn parse_exact_overflow_hours_exceed_23_in_c_format() {
     );
 }
 
+// TimeSpanTests.cs#L1272
 #[test]
 fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
     assert_eq!(
@@ -923,6 +981,7 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
 // checks that the total tick value is within [MinValue, MaxValue]. Out-of-range
 // components for custom formats therefore normalise automatically:
 // e.g. 26h → 1d 2h, 60m → 1h, 60s → 1m.
+// TimeSpanTests.cs#L1276
 #[test]
 fn parse_exact_overflow_custom_format_normalizes() {
     // 12d 35h 32m 43s — hours 35 > 23 but no range check in custom format path.
@@ -951,6 +1010,7 @@ fn parse_exact_custom_format_percent_s_overflow() {
     assert_eq!(TimeSpan::parse_exact("60", "%s").unwrap(), ts4(0, 0, 0, 60),);
 }
 
+// TimeSpanTests.cs#L1277-1278
 #[test]
 fn parse_exact_invalid_custom_wrong_digit_count_for_padded() {
     // "hh" needs 2 digits; input only has 1 then hits ':', which is a non-digit character
@@ -1185,10 +1245,9 @@ fn doc_custom_uppercase_fffffff_parse_h_m_ss_dot_fffffff() {
     );
 }
 
-// C# TimeSpanTests.cs — ParseExact_Invalid_TestData (TimeSpanTests.cs lines ~2060-2065):
-// format @"hh\mm\ss" = hh (2-digit hours) + literal 'm' + m (minutes) + literal 's' + ss.
-// Both inputs fail immediately after reading hh="12" because the format expects literal 'm'
-// but the input has ':'.
+// TimeSpanTests.cs#L1281-1282: format @"hh\mm\ss" = hh (2-digit hours) + literal 'm'
+// + m (minutes) + literal 's' + ss. Both inputs fail immediately after reading
+// hh="12" because the format expects literal 'm' but the input has ':'.
 #[test]
 fn parse_exact_invalid_escaped_letter_separator_mismatch() {
     assert_eq!(
