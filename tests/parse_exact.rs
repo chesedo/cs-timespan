@@ -527,7 +527,7 @@ fn parse_exact_invalid_percent_not_alone() {
     );
 }
 
-// TimeSpanTests.cs#L1289-1290, #L1293, #L1296, #L1299
+// TimeSpanTests.cs#L1289-1290, #L1293, #L1296-1297, #L1299
 #[test]
 fn parse_exact_invalid_repeated_specifier() {
     assert_eq!(
