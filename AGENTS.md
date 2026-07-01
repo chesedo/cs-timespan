@@ -8,9 +8,9 @@ deprecation layers. Just change the API and update all call sites.
 
 That said, the priority is always matching C# `System.TimeSpan` behavior exactly.
 If closing a gap requires a breaking change, make it — don't preserve a
-C#-incompatible API just for stability. Bump the crate version accordingly
-(semver-major for breaking changes) even though nothing is published yet, so the
-version history stays meaningful once it is.
+C#-incompatible API just for stability. Don't bump the crate version for this —
+version stays at `0.1.0` until the crate is actually published; only bump it
+once it is.
 
 ## Nix
 
