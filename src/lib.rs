@@ -119,6 +119,31 @@ impl std::fmt::Display for NegativeTimeSpan {
 
 impl std::error::Error for NegativeTimeSpan {}
 
+/// Error returned when constructing a [`TimeSpan`] from a floating-point value fails.
+///
+/// Mirrors the `ArgumentException`/`OverflowException` thrown by C#'s
+/// `TimeSpan.FromDays(double)` (and the other `From*(double)` factories).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FromFloatError {
+    /// The value was NaN.
+    Nan,
+    /// The value is outside the range representable by `TimeSpan`.
+    Overflow,
+}
+
+impl std::fmt::Display for FromFloatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FromFloatError::Nan => f.write_str("value cannot be NaN"),
+            FromFloatError::Overflow => {
+                f.write_str("value is outside the range representable by TimeSpan")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FromFloatError {}
+
 impl TimeSpan {
     // ── Tick-unit constants ────────────────────────────────────────────────────
     pub const TICKS_PER_MILLISECOND: i64 = 10_000;
@@ -156,6 +181,105 @@ impl TimeSpan {
     #[must_use]
     pub const fn ticks(self) -> i64 {
         self.ticks
+    }
+
+    // ── Float factory methods (mirror FromDays(double) / FromHours(double) / ...) ──
+    // Named with an _f64 suffix (rather than plain from_days/from_hours/...) to avoid
+    // clashing with the integer factories of the same conceptual name added separately
+    // -- Rust has no overloading. Matches std::time::Duration's own from_secs/
+    // from_secs_f64 precedent for the same integer-vs-float split.
+    // i64::MAX rounds up to 2^63 when cast to f64 (i64::MIN is exact, being a power of
+    // two); harmless here since it only widens the boundary check, and the saturating
+    // "as i64" cast below still clamps to the correct value at that boundary (see
+    // from_days_f64_max_value_boundary/from_days_f64_min_value_boundary tests).
+    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
+    fn interval(value: f64, scale: f64) -> Result<Self, FromFloatError> {
+        if value.is_nan() {
+            return Err(FromFloatError::Nan);
+        }
+        let ticks = value * scale;
+        if ticks > i64::MAX as f64 || ticks < i64::MIN as f64 {
+            return Err(FromFloatError::Overflow);
+        }
+        Ok(Self::from_ticks(ticks as i64))
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of days.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    #[allow(clippy::cast_precision_loss)] // TICKS_PER_DAY magnitude fits f64's mantissa
+    pub fn from_days_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, Self::TICKS_PER_DAY as f64)
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of hours.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_hours_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, Self::TICKS_PER_HOUR as f64)
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of minutes.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_minutes_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, Self::TICKS_PER_MINUTE as f64)
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of seconds.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_seconds_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, Self::TICKS_PER_SECOND as f64)
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of milliseconds.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_milliseconds_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, Self::TICKS_PER_MILLISECOND as f64)
+    }
+
+    /// Creates a `TimeSpan` from a fractional number of microseconds.
+    ///
+    /// Fractional ticks are truncated toward zero, not rounded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromFloatError::Nan`] if `value` is NaN, or
+    /// [`FromFloatError::Overflow`] if it's outside the representable range.
+    pub fn from_microseconds_f64(value: f64) -> Result<Self, FromFloatError> {
+        Self::interval(value, 10.0)
     }
 
     // ── Component properties (mirror Days / Hours / Minutes / ...) ────────────
