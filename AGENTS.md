@@ -12,6 +12,14 @@ C#-incompatible API just for stability. Don't bump the crate version for this â€
 version stays at `0.1.0` until the crate is actually published; only bump it
 once it is.
 
+## C# source citations
+
+When implementing a fix that mirrors specific C# `TimeSpan` behavior, cite the
+upstream source file and line number(s) in a comment above the Rust code, when
+possible (e.g. `// TimeSpan.cs#L338`). This makes it fast to re-verify the
+citation later if upstream changes, without re-deriving which lines the Rust
+code was based on.
+
 ## Nix
 
 The flake (`flake.nix`) is the source of truth for checks â€” it's what CI
