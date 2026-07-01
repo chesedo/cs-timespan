@@ -1,6 +1,8 @@
 use cs_timespan::TimeSpan;
 
 // ── Exact fractional values (representable precisely in f64) ─────────────────
+// Exercises the TotalDays/TotalHours/TotalMinutes/TotalSeconds/TotalMilliseconds/
+// TotalMicroseconds/TotalNanoseconds properties: TimeSpan.cs#L338-387
 
 #[test]
 fn total_days_fractional() {
@@ -72,8 +74,9 @@ fn negative_totals() {
 }
 
 // ── TotalMilliseconds clamping at the i64 tick boundaries ───────────────────────
-// C# clamps TotalMilliseconds to MinMilliseconds/MaxMilliseconds because casting
-// MIN_VALUE/MAX_VALUE ticks to f64 and dividing can round past the true boundary.
+// C# clamps TotalMilliseconds to MinMilliseconds/MaxMilliseconds (defined at
+// TimeSpan.cs#L213-214) because casting MIN_VALUE/MAX_VALUE ticks to f64 and
+// dividing can round past the true boundary.
 // Duplicates TotalMilliseconds_Invalid: TimeSpanTests.cs#L147-L154
 
 #[test]
