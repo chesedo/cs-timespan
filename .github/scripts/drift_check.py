@@ -17,6 +17,7 @@ MODEL = "claude-sonnet-4-6"
 MAX_ISSUES_PER_RUN = 15
 
 RUST_FILES = ["src/lib.rs", "src/parse.rs", "src/fmt.rs"]
+IGNORE_FILE = os.path.join(os.path.dirname(__file__), "drift_ignore.md")
 
 CSHARP_SOURCES = {
     "TimeSpan.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs",
@@ -96,10 +97,13 @@ def main() -> None:
         f"// ===== {name} =====\n{fetch(url)}" for name, url in CSHARP_SOURCES.items()
     )
     known = existing_drift_titles()
+    ignore_notes = read_local(IGNORE_FILE) if os.path.exists(IGNORE_FILE) else ""
 
     user_prompt = (
         f"Already-filed gaps (do not repeat these, by title):\n"
         f"{json.dumps(sorted(known))}\n\n"
+        f"Accepted-as-intentional divergences (do NOT report gaps matching these, "
+        f"even under a different title):\n{ignore_notes}\n\n"
         f"--- RUST SOURCE ---\n{rust_blob}\n\n"
         f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
     )
