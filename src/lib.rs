@@ -132,6 +132,14 @@ impl TimeSpan {
     pub const MAX_VALUE: TimeSpan = TimeSpan { ticks: i64::MAX };
     pub const MIN_VALUE: TimeSpan = TimeSpan { ticks: i64::MIN };
 
+    // Mirrors C#'s MinMilliseconds/MaxMilliseconds: i64::MIN/MAX ticks converted
+    // to whole milliseconds, used to clamp total_milliseconds() below.
+    // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs#L213-L214
+    #[allow(clippy::cast_precision_loss)] // exact: magnitude fits f64's mantissa
+    const MIN_MILLISECONDS: f64 = (i64::MIN / Self::TICKS_PER_MILLISECOND) as f64;
+    #[allow(clippy::cast_precision_loss)]
+    const MAX_MILLISECONDS: f64 = (i64::MAX / Self::TICKS_PER_MILLISECOND) as f64;
+
     // ── Raw construction ───────────────────────────────────────────────────────
     /// Creates a `TimeSpan` from a raw tick count (1 tick = 100 ns).
     ///
@@ -207,6 +215,67 @@ impl TimeSpan {
     #[allow(clippy::cast_possible_truncation)] // (ticks % 10) * 100 is at most 900
     pub const fn nanoseconds(self) -> i32 {
         (self.ticks % 10 * 100) as i32
+    }
+
+    // ── Total properties (mirror TotalDays / TotalHours / ...) ────────────────
+    // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs#L338-L387
+    /// Returns the total number of days, as a fractional value.
+    // TimeSpan.cs#L338
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // matches C#'s (double)_ticks precision loss
+    pub fn total_days(self) -> f64 {
+        self.ticks as f64 / Self::TICKS_PER_DAY as f64
+    }
+
+    /// Returns the total number of hours, as a fractional value.
+    // TimeSpan.cs#L340
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_hours(self) -> f64 {
+        self.ticks as f64 / Self::TICKS_PER_HOUR as f64
+    }
+
+    /// Returns the total number of minutes, as a fractional value.
+    // TimeSpan.cs#L385
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_minutes(self) -> f64 {
+        self.ticks as f64 / Self::TICKS_PER_MINUTE as f64
+    }
+
+    /// Returns the total number of seconds, as a fractional value.
+    // TimeSpan.cs#L387
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_seconds(self) -> f64 {
+        self.ticks as f64 / Self::TICKS_PER_SECOND as f64
+    }
+
+    /// Returns the total number of milliseconds, as a fractional value, clamped
+    /// to the range representable by `i64::MIN`/`i64::MAX` ticks.
+    // TimeSpan.cs#L342-L355 (the clamp guards against (double)_ticks rounding
+    // past the true i64-derived boundary for MIN_VALUE/MAX_VALUE)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_milliseconds(self) -> f64 {
+        let temp = self.ticks as f64 / Self::TICKS_PER_MILLISECOND as f64;
+        temp.clamp(Self::MIN_MILLISECONDS, Self::MAX_MILLISECONDS)
+    }
+
+    /// Returns the total number of microseconds, as a fractional value.
+    // TimeSpan.cs#L371
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_microseconds(self) -> f64 {
+        self.ticks as f64 / 10.0
+    }
+
+    /// Returns the total number of nanoseconds, as a fractional value.
+    // TimeSpan.cs#L383
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn total_nanoseconds(self) -> f64 {
+        self.ticks as f64 * 100.0
     }
 
     // ── Lenient parsing (mirrors Parse / TryParse) ─────────────────────────────
