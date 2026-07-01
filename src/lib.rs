@@ -161,6 +161,9 @@ impl std::fmt::Display for TimeSpanOverflow {
 impl std::error::Error for TimeSpanOverflow {}
 
 impl TimeSpan {
+    // ── Nanosecond-unit constants ───────────────────────────────────────────────
+    pub const NANOSECONDS_PER_TICK: i64 = 100;
+
     // ── Tick-unit constants ────────────────────────────────────────────────────
     pub const TICKS_PER_MICROSECOND: i64 = 10;
     pub const TICKS_PER_MILLISECOND: i64 = 10_000;
