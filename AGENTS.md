@@ -15,15 +15,19 @@ once it is.
 ## C# source citations
 
 When implementing a fix that mirrors specific C# `TimeSpan` behavior, cite the
-upstream source file and line number(s) in a comment above the Rust code, when
-possible (e.g. `// TimeSpan.cs#L338`). This makes it fast to re-verify the
-citation later if upstream changes, without re-deriving which lines the Rust
-code was based on.
+upstream source file and line number(s), when possible (e.g. `// TimeSpan.cs#L338`).
+This makes it fast to re-verify the citation later if upstream changes, without
+re-deriving which lines the Rust code was based on.
+
+Prefer placing the citation in the test that exercises the behavior rather than
+inline in the implementation — put it directly above the test function itself
+(not scattered inside the test body). Only cite in `src/*.rs` when no test
+covers the specific behavior being mirrored.
 
 The same applies when a Rust test is duplicating a specific C# test case (e.g.
 from `TimeSpanTests.cs`): cite the file and line(s) of the test being mirrored,
-so it's clear which upstream case is being reproduced and easy to check if that
-case changes.
+directly above the test function, so it's clear which upstream case is being
+reproduced and easy to check if that case changes.
 
 ## Nix
 
