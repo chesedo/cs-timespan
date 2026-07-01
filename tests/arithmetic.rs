@@ -1,4 +1,4 @@
-use cs_timespan::{FloatError, TimeSpan};
+use cs_timespan::{FloatError, TimeSpan, TimeSpanOverflow};
 
 fn ts(ticks: i64) -> TimeSpan {
     TimeSpan::from_ticks(ticks)
@@ -56,6 +56,28 @@ fn neg_negative() {
 #[test]
 fn neg_zero() {
     assert_eq!(-TimeSpan::ZERO, TimeSpan::ZERO);
+}
+
+// ── Duration ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn duration_positive() {
+    assert_eq!(ts(5 * SEC).duration(), Ok(ts(5 * SEC)));
+}
+
+#[test]
+fn duration_negative() {
+    assert_eq!(ts(-5 * SEC).duration(), Ok(ts(5 * SEC)));
+}
+
+#[test]
+fn duration_zero() {
+    assert_eq!(TimeSpan::ZERO.duration(), Ok(TimeSpan::ZERO));
+}
+
+#[test]
+fn duration_min_value_overflows() {
+    assert_eq!(TimeSpan::MIN_VALUE.duration(), Err(TimeSpanOverflow));
 }
 
 // ── AddAssign / SubAssign ─────────────────────────────────────────────────────
