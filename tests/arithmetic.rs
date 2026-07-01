@@ -1,4 +1,4 @@
-use cs_timespan::TimeSpan;
+use cs_timespan::{FromFloatError, TimeSpan};
 
 fn ts(ticks: i64) -> TimeSpan {
     TimeSpan::from_ticks(ticks)
@@ -133,6 +133,162 @@ fn div_timespan_by_timespan_ratio() {
 fn div_timespan_by_timespan_fractional() {
     let ratio = ts(1 * HR) / ts(2 * HR);
     assert!((ratio - 0.5_f64).abs() < 1e-10);
+}
+
+// ── Mul<f64> / Div<f64> / multiply / divide ────────────────────────────────────
+// TimeSpanTests.cs#L1718-1728 (MultiplicationTestData)
+
+fn multiplication_test_data() -> Vec<(TimeSpan, f64, TimeSpan)> {
+    vec![
+        (ts(2 * HR + 30 * MIN), 2.0, ts(5 * HR)),
+        (
+            ts(14 * DAY + 2 * HR + 30 * MIN),
+            192.0,
+            TimeSpan::from_days(2708).unwrap(),
+        ),
+        (
+            TimeSpan::from_days_f64(366.0).unwrap(),
+            std::f64::consts::PI,
+            ts(993_446_995_288_779),
+        ),
+        (
+            TimeSpan::from_days_f64(366.0).unwrap(),
+            -std::f64::consts::E,
+            ts(-859_585_952_922_633),
+        ),
+        (
+            TimeSpan::from_days_f64(29.530_587_981).unwrap(),
+            13.0,
+            TimeSpan::from_days_f64(29.530_587_981 * 13.0).unwrap(),
+        ),
+        (
+            TimeSpan::from_days_f64(-29.530_587_981).unwrap(),
+            -12.0,
+            TimeSpan::from_days_f64(-29.530_587_981 * -12.0).unwrap(),
+        ),
+        (
+            TimeSpan::from_days_f64(-29.530_587_981).unwrap(),
+            0.0,
+            TimeSpan::ZERO,
+        ),
+        (
+            TimeSpan::MAX_VALUE,
+            0.5,
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+            ts((i64::MAX as f64 * 0.5) as i64),
+        ),
+    ]
+}
+
+// TimeSpanTests.cs#L1754-1759
+#[test]
+fn mul_f64_test_data() {
+    for (timespan, factor, expected) in multiplication_test_data() {
+        assert_eq!(timespan * factor, expected);
+        assert_eq!(factor * timespan, expected);
+    }
+}
+
+// TimeSpanTests.cs#L1761-1766
+#[test]
+#[should_panic(expected = "TimeSpan multiply by f64 failed")]
+fn mul_f64_overflow_panics() {
+    let _ = TimeSpan::MAX_VALUE * 1.000000001;
+}
+
+// TimeSpanTests.cs#L1768-1773
+#[test]
+#[should_panic(expected = "TimeSpan multiply by f64 failed")]
+fn mul_f64_nan_panics() {
+    let _ = TimeSpan::from_days(1).unwrap() * f64::NAN;
+}
+
+// TimeSpanTests.cs#L1775-1781
+#[test]
+fn div_f64_test_data() {
+    for (timespan, factor, expected) in multiplication_test_data() {
+        let divisor = 1.0 / factor;
+        assert_eq!(timespan / divisor, expected);
+    }
+}
+
+// TimeSpanTests.cs#L1783-1792
+#[test]
+fn div_f64_by_zero_overflows() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap().divide(0.0),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(
+        TimeSpan::from_days(-1).unwrap().divide(0.0),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FromFloatError::Overflow));
+}
+
+// TimeSpanTests.cs#L1794-1798
+#[test]
+#[should_panic(expected = "TimeSpan divide by f64 failed")]
+fn div_f64_nan_panics() {
+    let _ = TimeSpan::from_days(1).unwrap() / f64::NAN;
+}
+
+// TimeSpanTests.cs#L1800-1804
+#[test]
+fn multiply_method_test_data() {
+    for (timespan, factor, expected) in multiplication_test_data() {
+        assert_eq!(timespan.multiply(factor), Ok(expected));
+    }
+}
+
+// TimeSpanTests.cs#L1806-1810
+#[test]
+fn multiply_method_overflow() {
+    assert_eq!(
+        TimeSpan::MAX_VALUE.multiply(1.000000001),
+        Err(FromFloatError::Overflow)
+    );
+}
+
+// TimeSpanTests.cs#L1812-1816
+#[test]
+fn multiply_method_nan() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap().multiply(f64::NAN),
+        Err(FromFloatError::Nan)
+    );
+}
+
+// TimeSpanTests.cs#L1818-1824
+#[test]
+fn divide_method_test_data() {
+    for (timespan, factor, expected) in multiplication_test_data() {
+        let divisor = 1.0 / factor;
+        assert_eq!(timespan.divide(divisor), Ok(expected));
+    }
+}
+
+// TimeSpanTests.cs#L1826-1835
+#[test]
+fn divide_method_by_zero() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap().divide(0.0),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(
+        TimeSpan::from_days(-1).unwrap().divide(0.0),
+        Err(FromFloatError::Overflow)
+    );
+    assert_eq!(TimeSpan::ZERO.divide(0.0), Err(FromFloatError::Overflow));
+}
+
+// TimeSpanTests.cs#L1837-1841
+#[test]
+fn divide_method_nan() {
+    assert_eq!(
+        TimeSpan::from_days(1).unwrap().divide(f64::NAN),
+        Err(FromFloatError::Nan)
+    );
 }
 
 // ── Chained expressions ───────────────────────────────────────────────────────
