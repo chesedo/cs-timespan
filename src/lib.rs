@@ -779,7 +779,6 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
-    // TimeSpan.cs#L893
     pub const fn checked_add(self, rhs: Self) -> Result<Self, TimeSpanOverflow> {
         match self.ticks.checked_add(rhs.ticks) {
             Some(ticks) => Ok(Self::from_ticks(ticks)),
@@ -795,7 +794,6 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
-    // TimeSpan.cs#L877
     pub const fn checked_sub(self, rhs: Self) -> Result<Self, TimeSpanOverflow> {
         match self.ticks.checked_sub(rhs.ticks) {
             Some(ticks) => Ok(Self::from_ticks(ticks)),
@@ -812,7 +810,6 @@ impl TimeSpan {
     ///
     /// Returns [`TimeSpanOverflow`] for [`TimeSpan::MIN_VALUE`], whose negation is
     /// outside the representable range.
-    // TimeSpan.cs#L868
     pub const fn checked_neg(self) -> Result<Self, TimeSpanOverflow> {
         match self.ticks.checked_neg() {
             Some(ticks) => Ok(Self::from_ticks(ticks)),
