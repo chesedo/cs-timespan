@@ -535,6 +535,30 @@ impl TimeSpan {
         self.ticks as f64 * 100.0
     }
 
+    /// Returns the absolute value of this `TimeSpan`.
+    ///
+    /// Mirrors C#'s `TimeSpan.Duration()`.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(
+    ///     TimeSpan::from_ticks(-5).duration(),
+    ///     Ok(TimeSpan::from_ticks(5)),
+    /// );
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeSpanOverflow`] for [`TimeSpan::MIN_VALUE`], whose absolute
+    /// value is outside the representable range.
+    pub const fn duration(self) -> Result<Self, TimeSpanOverflow> {
+        match self.ticks.checked_abs() {
+            Some(ticks) => Ok(Self::from_ticks(ticks)),
+            None => Err(TimeSpanOverflow),
+        }
+    }
+
     // ── Lenient parsing (mirrors Parse / TryParse) ─────────────────────────────
     /// Parses a time interval string using the invariant culture (`.` decimal separator).
     ///
