@@ -11,7 +11,7 @@ import subprocess
 import sys
 import urllib.request
 
-REPO = "chesedo/timespan-rs"
+REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
 MODEL = "claude-sonnet-4-6"
 MAX_ISSUES_PER_RUN = 15
@@ -20,8 +20,8 @@ RUST_FILES = ["src/lib.rs", "src/parse.rs", "src/fmt.rs"]
 
 CSHARP_SOURCES = {
     "TimeSpan.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/TimeSpan.cs",
-    "TimeSpanParse.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/TimeSpanParse.cs",
-    "TimeSpanFormat.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/TimeSpanFormat.cs",
+    "TimeSpanParse.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/Globalization/TimeSpanParse.cs",
+    "TimeSpanFormat.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Private.CoreLib/src/System/Globalization/TimeSpanFormat.cs",
     "TimeSpanTests.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs",
 }
 
