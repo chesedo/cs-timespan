@@ -121,6 +121,12 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
     )
     with urllib.request.urlopen(req, timeout=120) as resp:
         data = json.loads(resp.read().decode("utf-8"))
+    if data.get("stop_reason") == "max_tokens":
+        print(
+            "Warning: response was cut off (hit max_tokens). The JSON below is "
+            "likely incomplete — consider raising max_tokens in call_claude().",
+            file=sys.stderr,
+        )
     return "".join(block["text"] for block in data["content"] if block["type"] == "text")
 
 
@@ -128,8 +134,10 @@ def parse_json_response(raw: str, label: str) -> object:
     try:
         return json.loads(raw.strip())
     except json.JSONDecodeError:
-        print(f"Claude did not return valid JSON ({label}):", file=sys.stderr)
-        print(raw, file=sys.stderr)
+        print(f"Claude did not return valid JSON ({label}). Raw response was:", file=sys.stderr)
+        print("--- start raw response ---", file=sys.stderr)
+        print(raw if raw.strip() else "(empty)", file=sys.stderr)
+        print("--- end raw response ---", file=sys.stderr)
         sys.exit(1)
 
 
