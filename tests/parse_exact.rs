@@ -67,7 +67,7 @@ fn parse_exact_constant_format_d_dot_hms() {
     }
 }
 
-// C# TimeSpanParse.cs ParseTime (line 1384): `if (_ch == ':')` makes the second colon
+// C# TimeSpanParse.cs ParseTime (line 1625): `if (_ch == ':')` makes the second colon
 // and seconds component optional — "hh:mm" and "d.hh:mm" are valid "c" inputs.
 // (No direct ParseExact_Valid_TestData row for this reduced form; it documents
 // StringParser.ParseTime behavior rather than duplicating a specific test case.)
@@ -976,38 +976,51 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
     );
 }
 
-// C# TimeSpanParse.cs `TryTimeToTicks` (dotnet/runtime): the function that converts
-// parsed h/m/s components to ticks performs NO per-component range checks — it only
-// checks that the total tick value is within [MinValue, MaxValue]. Out-of-range
-// components for custom formats therefore normalise automatically:
-// e.g. 26h → 1d 2h, 60m → 1h, 60s → 1m.
+// C# TimeSpanParse.cs `TryTimeToTicks` (dotnet/runtime) rejects hours >= 24 /
+// minutes >= 60 / seconds >= 60 with OverflowException unconditionally — custom
+// format parsing routes through the same function as standard formats, so there's
+// no normalizing path for out-of-range components.
 // TimeSpanTests.cs#L1276
 #[test]
-fn parse_exact_overflow_custom_format_normalizes() {
-    // 12d 35h 32m 43s — hours 35 > 23 but no range check in custom format path.
-    // Total = tick-equivalent of 13d 11h 32m 43s.
+fn parse_exact_overflow_custom_format_hours() {
     assert_eq!(
-        TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s").unwrap(),
-        ts4(12, 35, 32, 43),
+        TimeSpan::parse_exact("12.35:32:43", r"dd\.h\:m\:s")
+            .unwrap_err()
+            .to_string(),
+        r#"hours value 35 is out of range; must be 0-23
+  "12.35:32:43"
+      ^"#,
     );
 }
 
 #[test]
 fn parse_exact_custom_format_percent_h_overflow() {
-    // TimeSpan.ParseExact("26", "%h", null) → 1d 2h (C# docs example)
-    assert_eq!(TimeSpan::parse_exact("26", "%h").unwrap(), ts4(0, 26, 0, 0),);
+    assert_eq!(
+        TimeSpan::parse_exact("26", "%h").unwrap_err().to_string(),
+        r#"hours value 26 is out of range; must be 0-23
+  "26"
+   ^"#,
+    );
 }
 
 #[test]
 fn parse_exact_custom_format_percent_m_overflow() {
-    // 60 minutes normalises to 1h 0m
-    assert_eq!(TimeSpan::parse_exact("60", "%m").unwrap(), ts4(0, 0, 60, 0),);
+    assert_eq!(
+        TimeSpan::parse_exact("60", "%m").unwrap_err().to_string(),
+        r#"minutes value 60 is out of range; must be 0-59
+  "60"
+   ^"#,
+    );
 }
 
 #[test]
 fn parse_exact_custom_format_percent_s_overflow() {
-    // 60 seconds normalises to 1m 0s
-    assert_eq!(TimeSpan::parse_exact("60", "%s").unwrap(), ts4(0, 0, 0, 60),);
+    assert_eq!(
+        TimeSpan::parse_exact("60", "%s").unwrap_err().to_string(),
+        r#"seconds value 60 is out of range; must be 0-59
+  "60"
+   ^"#,
+    );
 }
 
 // TimeSpanTests.cs#L1277-1278
