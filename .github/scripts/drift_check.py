@@ -52,11 +52,15 @@ ownership, idiomatic Rust API shape). Only list things that could plausibly caus
 a Rust caller to get a different externally-observable result than the equivalent \
 C# call.
 
-Respond with ONLY a JSON array, no prose, no markdown fences. Each element:
+Respond with ONLY a JSON array. Each element:
 {"title": "<short imperative title, under 80 chars>",
  "hint": "<1-3 sentences pointing at the specific C# behavior/citation and the \
 Rust code location to compare it against>"}
 Return an empty array [] if you find nothing plausible.
+
+Your entire reply must be raw JSON, nothing else: no prose before or after, and \
+no ``` or ```json markdown code fences. The first character of your reply must \
+be [ and the last character must be ].
 """
 
 VERIFY_SYSTEM_PROMPT = """\
@@ -75,11 +79,15 @@ MUST reject it — a suggestive title is never sufficient on its own.
 Also reject the candidate if it matches an already-accepted-as-intentional \
 divergence listed below, even under different wording.
 
-Respond with ONLY a JSON object, no prose, no markdown fences:
+Respond with ONLY a JSON object:
 - Confirmed: {"confirmed": true, "title": "<short imperative title, under 80 chars>", \
 "body": "<markdown explanation citing the relevant C# snippet and the specific \
 input/expected/actual values that differ>"}
 - Rejected: {"confirmed": false, "reason": "<one sentence why>"}
+
+Your entire reply must be raw JSON, nothing else: no prose before or after, and \
+no ``` or ```json markdown code fences. The first character of your reply must \
+be { and the last character must be }.
 """
 
 
