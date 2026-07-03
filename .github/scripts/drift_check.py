@@ -10,8 +10,10 @@ confirmed gaps are printed instead of created as GitHub issues.
 
 import json
 import os
+import socket
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 REPO = "chesedo/cs-timespan"
@@ -120,8 +122,15 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
             "anthropic-version": "2023-06-01",
         },
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (TimeoutError, socket.timeout):
+        print("Anthropic API call timed out (600s). Try again.", file=sys.stderr)
+        sys.exit(1)
+    except urllib.error.HTTPError as e:
+        print(f"Anthropic API returned HTTP {e.code}: {e.read().decode('utf-8')}", file=sys.stderr)
+        sys.exit(1)
     if data.get("stop_reason") == "max_tokens":
         print(
             f"Warning: response was cut off (hit max_tokens={MAX_TOKENS}). The "
