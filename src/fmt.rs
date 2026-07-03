@@ -19,7 +19,9 @@ pub enum FormatErrorKind {
     InvalidStandardFormat(char),
     /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
     UnclosedQuote,
-    /// `%%` or a lone `%` at end of format string.
+    /// `%%`, or a `%` at the end of a multi-character custom format string
+    /// (a lone single-character `"%"` is rejected earlier as
+    /// [`InvalidStandardFormat`](FormatErrorKind::InvalidStandardFormat)).
     InvalidPercent,
     /// A trailing `\` at end of format string with no character to escape.
     TrailingEscape,
