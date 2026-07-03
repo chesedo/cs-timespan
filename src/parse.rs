@@ -135,10 +135,6 @@ pub enum TimeSpanStyles {
 
 struct Builder<'a> {
     neg: bool,
-    // When true, hours >= 24 / minutes >= 60 / seconds >= 60 are rejected with a
-    // specific OverflowKind error. False for custom-format parsing, where C# accepts
-    // out-of-range components and normalizes them into the total tick count.
-    strict: bool,
     original: &'a str,
     days: Option<&'a str>,
     hours: Option<&'a str>,
@@ -151,7 +147,6 @@ impl<'a> Builder<'a> {
     fn new(neg: bool, original: &'a str) -> Self {
         Self {
             neg,
-            strict: true,
             original,
             days: None,
             hours: None,
@@ -161,47 +156,38 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn lenient(mut self) -> Self {
-        self.strict = false;
-        self
-    }
-
+    // C# TryTimeToTicks (TimeSpanParse.cs) rejects hours >= 24 / minutes >= 60 /
+    // seconds >= 60 with OverflowException unconditionally — standard and custom
+    // format parsing both route through it, so there's no lenient/normalizing path.
     fn build(self) -> Result<TimeSpan, ParseError> {
         let days = parse_component_uint(self.days, self.original)?;
         let h = parse_component_uint(self.hours, self.original)?;
         let m = parse_component_uint(self.minutes, self.original)?;
         let sv = parse_component_uint(self.seconds, self.original)?;
         let frac = parse_component_frac(self.frac, self.original)?;
-        if self.strict {
-            if h >= 24 {
-                let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
-                return Err(overflow(OverflowKind::Hours(h), pos, self.original));
-            }
-            if m >= 60 {
-                let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
-                return Err(overflow(OverflowKind::Minutes(m), pos, self.original));
-            }
-            if sv >= 60 {
-                let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
-                return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
-            }
-            // h ≤ 23, m ≤ 59, sv ≤ 59: safe to narrow and use fast u64 path
-            #[allow(clippy::cast_possible_truncation)]
-            return build_ticks_strict(
-                self.neg,
-                days,
-                h as u32,
-                m as u32,
-                sv as u32,
-                frac,
-                self.original,
-            );
+        if h >= 24 {
+            let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
+            return Err(overflow(OverflowKind::Hours(h), pos, self.original));
         }
-        let ovf = || overflow(OverflowKind::Value, 0, self.original);
-        let h32 = u32::try_from(h).map_err(|_| ovf())?;
-        let m32 = u32::try_from(m).map_err(|_| ovf())?;
-        let sv32 = u32::try_from(sv).map_err(|_| ovf())?;
-        build_ticks(self.neg, days, h32, m32, sv32, frac, self.original)
+        if m >= 60 {
+            let pos = self.minutes.map_or(0, |s| offset_of(self.original, s));
+            return Err(overflow(OverflowKind::Minutes(m), pos, self.original));
+        }
+        if sv >= 60 {
+            let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
+            return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
+        }
+        // h ≤ 23, m ≤ 59, sv ≤ 59: safe to narrow and use fast u64 path
+        #[allow(clippy::cast_possible_truncation)]
+        build_ticks(
+            self.neg,
+            days,
+            h as u32,
+            m as u32,
+            sv as u32,
+            frac,
+            self.original,
+        )
     }
 }
 
@@ -282,9 +268,9 @@ fn offset_of(original: &str, sub: &str) -> usize {
     (sub.as_ptr() as usize).saturating_sub(original.as_ptr() as usize)
 }
 
-// Fast path for standard-format parsing: h/m/s are range-checked (≤ 23/59/59) so all
+// h/m/s are always range-checked to ≤ 23/59/59 by the caller before this runs, so all
 // arithmetic stays in u64 — no u128 needed, which is significantly cheaper on x86-64.
-fn build_ticks_strict(
+fn build_ticks(
     neg: bool,
     days: u64,
     h: u32,
@@ -318,45 +304,6 @@ fn build_ticks_strict(
             return Err(ovf());
         }
         #[allow(clippy::cast_possible_wrap)] // ticks ≤ i64::MAX
-        Ok(TimeSpan::from_ticks(ticks as i64))
-    }
-}
-
-// Lenient path: h/m/s may exceed normal ranges, so u128 is required to detect overflow
-// before truncating to i64. Callers must pre-check h/m/s fit in u32 (values > u32::MAX
-// would overflow i64 anyway, so returning OverflowKind::Value is correct).
-fn build_ticks(
-    neg: bool,
-    days: u64,
-    h: u32,
-    m: u32,
-    s: u32,
-    frac: u32,
-    original: &str,
-) -> Result<TimeSpan, ParseError> {
-    let ovf = || overflow(OverflowKind::Value, 0, original);
-    let ticks = u128::from(days)
-        .checked_mul(TimeSpan::TICKS_PER_DAY as u128)
-        .and_then(|t| t.checked_add(u128::from(h) * TimeSpan::TICKS_PER_HOUR as u128))
-        .and_then(|t| t.checked_add(u128::from(m) * TimeSpan::TICKS_PER_MINUTE as u128))
-        .and_then(|t| t.checked_add(u128::from(s) * TimeSpan::TICKS_PER_SECOND as u128))
-        .and_then(|t| t.checked_add(u128::from(frac)))
-        .ok_or_else(ovf)?;
-    if neg {
-        const ABS_MIN: u128 = (i64::MAX as u128) + 1;
-        if ticks > ABS_MIN {
-            return Err(ovf());
-        } else if ticks == ABS_MIN {
-            return Ok(TimeSpan::from_ticks(i64::MIN));
-        }
-        #[allow(clippy::cast_possible_truncation)]
-        // ticks <= ABS_MIN <= i64::MAX + 1, checked above
-        Ok(TimeSpan::from_ticks(-(ticks as i64)))
-    } else {
-        if ticks > i64::MAX as u128 {
-            return Err(ovf());
-        }
-        #[allow(clippy::cast_possible_truncation)] // ticks <= i64::MAX, checked above
         Ok(TimeSpan::from_ticks(ticks as i64))
     }
 }
@@ -716,7 +663,7 @@ fn parse_custom(input: &str, fmt: &str) -> Result<TimeSpan, ParseError> {
     }
     let mut it = fmt.chars().peekable();
     let mut inp = input;
-    let mut b = Builder::new(false, input).lenient();
+    let mut b = Builder::new(false, input);
     let mut fmt_pos = 0usize;
 
     while let Some(mut ch) = it.next() {
