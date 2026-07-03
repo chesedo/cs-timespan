@@ -10,20 +10,11 @@ scanner turns out to be out of scope, instead of just closing the issue.
 Format: one "### <short label>" heading per entry, with a one-paragraph reason.
 -->
 
-### Misread `TimeSpan(days, hours, minutes, seconds)` constructor argument order
+### `TimeSpan(days, hours, minutes, seconds)` constructor argument order
 
-Watch for gaps whose "expected" value comes from a C# test data row that
-constructs a `TimeSpan` via the 4-arg constructor, e.g.
-`new TimeSpan(24, 0, 0, 0)`, and whose write-up glosses that value in prose as
-"24 hours" or otherwise slides the leading integer into the wrong field. The
-constructor signature is `TimeSpan(int days, int hours, int minutes, int
-seconds)` — the first argument is always **days**, not hours — so
-`new TimeSpan(24, 0, 0, 0)` is 24 days, not "24 hours promoted to 1 day."
-Before filing, re-derive the expected value directly from the constructor
-argument positions (or the literal tick count already given alongside it in
-the test data) rather than trusting an inline English paraphrase of what the
-constructor call "means." Issue #9 was filed this way: it claimed lenient
-parsing of `"24:00:00"` should overflow-promote to 1 day, but the cited
-`new TimeSpan(24, 0, 0, 0)` is actually 24 days, and Rust's
-`TimeSpan::parse("24:00:00")` already returns `24 * TICKS_PER_DAY`
-(20736000000000), matching C# tick-for-tick.
+The 4-arg C# constructor is `TimeSpan(int days, int hours, int minutes, int
+seconds)` — the first argument is **days**, not hours. When a cited test row
+constructs the expected value this way (e.g. `new TimeSpan(24, 0, 0, 0)`),
+derive the expected value from the argument positions directly; don't trust a
+prose paraphrase that slides the leading integer into the wrong field (e.g.
+reading `new TimeSpan(24, 0, 0, 0)` as "24 hours"). Caused issue #9.
