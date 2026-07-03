@@ -14,6 +14,9 @@ pub enum FormatErrorKind {
     /// An unrecognised character appeared in the custom format string.
     /// Contains the offending character.
     UnknownSpecifier(char),
+    /// A single-character format string that isn't a recognised standard format
+    /// (`c`/`t`/`T`/`g`/`G`). Contains the offending character.
+    InvalidStandardFormat(char),
     /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
     UnclosedQuote,
     /// `%%` or a lone `%` at end of format string.
@@ -60,6 +63,19 @@ impl std::fmt::Display for FormatError {
                 f,
                 "unrecognised specifier '{ch}'; valid specifiers: d h m s f F"
             )?,
+            FormatErrorKind::InvalidStandardFormat(ch) => {
+                if matches!(ch, 'd' | 'h' | 'm' | 's' | 'f' | 'F') {
+                    writeln!(
+                        f,
+                        "'{ch}' must be prefixed with '%' when used alone (e.g. '%{ch}'); valid standard formats: c t T g G"
+                    )?;
+                } else {
+                    writeln!(
+                        f,
+                        "'{ch}' is not a valid standard format string; valid standard formats: c t T g G"
+                    )?;
+                }
+            }
             FormatErrorKind::UnclosedQuote => writeln!(f, "quoted literal is not closed")?,
             FormatErrorKind::InvalidPercent => writeln!(
                 f,
@@ -176,10 +192,10 @@ impl Components {
         // matched against "c"/"t"/"T"/"g"/"G" (handled by format_timespan's dispatch
         // before this function is called) — any other single character throws
         // FormatException without ever reaching FormatCustomized's specifier syntax.
-        if fmt.chars().count() < 2 {
-            let ch = fmt.chars().next().unwrap();
+        let mut probe = fmt.chars();
+        if let (Some(ch), None) = (probe.next(), probe.next()) {
             return Err(FormatError::new(
-                FormatErrorKind::UnknownSpecifier(ch),
+                FormatErrorKind::InvalidStandardFormat(ch),
                 0,
                 fmt,
             ));

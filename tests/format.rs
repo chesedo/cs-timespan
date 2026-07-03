@@ -60,9 +60,14 @@ fn format_custom_percent_d() {
 #[test]
 fn format_custom_bare_specifier_without_percent_rejected() {
     for fmt in ["d", "h", "m", "s", "f", "F"] {
-        assert!(
-            input().to_string_fmt(fmt).is_err(),
-            "expected {fmt:?} to be rejected without a '%' prefix",
+        assert_eq!(
+            input().to_string_fmt(fmt).unwrap_err().to_string(),
+            format!(
+                r#"'{fmt}' must be prefixed with '%' when used alone (e.g. '%{fmt}'); valid standard formats: c t T g G
+  "{fmt}"
+   ^"#
+            ),
+            "format={fmt:?}",
         );
     }
 }
@@ -577,13 +582,13 @@ fn format_custom_invalid_percent() {
 fn format_custom_single_char_not_standard_rejected() {
     assert_eq!(
         input().to_string_fmt("%").unwrap_err().to_string(),
-        r#"unrecognised specifier '%'; valid specifiers: d h m s f F
+        r#"'%' is not a valid standard format string; valid standard formats: c t T g G
   "%"
    ^"#
     );
     assert_eq!(
         input().to_string_fmt(r"\").unwrap_err().to_string(),
-        r#"unrecognised specifier '\'; valid specifiers: d h m s f F
+        r#"'\' is not a valid standard format string; valid standard formats: c t T g G
   "\"
    ^"#
     );
