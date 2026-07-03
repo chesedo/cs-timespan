@@ -174,18 +174,6 @@ def verify_candidate(
     return data
 
 
-def dedupe_candidates(candidates: list[dict]) -> list[dict]:
-    seen: set[str] = set()
-    deduped = []
-    for candidate in candidates:
-        key = candidate["title"].strip().lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(candidate)
-    return deduped
-
-
 def main() -> None:
     rust_blob = "\n\n".join(
         f"// ===== {path} =====\n{read_local(path)}" for path in RUST_FILES
@@ -201,18 +189,12 @@ def main() -> None:
         print("No candidates found.")
         return
 
-    candidates = dedupe_candidates(candidates)
-
-    if len(candidates) > MAX_ISSUES_PER_RUN:
-        print(
-            f"Found {len(candidates)} candidates, capping at {MAX_ISSUES_PER_RUN} "
-            f"for this run.",
-            file=sys.stderr,
-        )
-        candidates = candidates[:MAX_ISSUES_PER_RUN]
-
     filed = 0
     for candidate in candidates:
+        if filed >= MAX_ISSUES_PER_RUN:
+            print(f"Filed {MAX_ISSUES_PER_RUN} issues, stopping for this run.", file=sys.stderr)
+            break
+
         title = candidate["title"].strip()
         if title in known:
             continue
