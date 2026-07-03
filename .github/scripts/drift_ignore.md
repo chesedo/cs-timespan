@@ -14,7 +14,6 @@ Format: one "### <short label>" heading per entry, with a one-paragraph reason.
 
 The 4-arg C# constructor is `TimeSpan(int days, int hours, int minutes, int
 seconds)` — the first argument is **days**, not hours. When a cited test row
-constructs the expected value this way (e.g. `new TimeSpan(24, 0, 0, 0)`),
-derive the expected value from the argument positions directly; don't trust a
-prose paraphrase that slides the leading integer into the wrong field (e.g.
-reading `new TimeSpan(24, 0, 0, 0)` as "24 hours"). Caused issue #9.
+constructs the expected value this way, derive it from the argument positions
+directly: `new TimeSpan(24, 0, 0, 0)` is 24 days, not "24 hours." Caused issue
+#9.
