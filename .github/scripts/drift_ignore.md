@@ -17,10 +17,3 @@ seconds)` — the first argument is **days**, not hours. When a cited test row
 constructs the expected value this way, derive it from the argument positions
 directly: `new TimeSpan(24, 0, 0, 0)` is 24 days, not "24 hours." Caused issue
 #9.
-
-### "g"/"G" parse: empty-seconds-with-fraction segments (e.g. "1:2:.3", "1:2:3:.4")
-
-Already covered by passing tests `parse_exact_g_hm_with_fraction` and
-`parse_exact_g_d_hm_with_fraction` in `tests/parse_exact.rs`, pinned to the
-cited `TimeSpanTests.cs` rows. Don't re-flag this unless a new, concretely
-failing input is identified. Caused issue #8.
