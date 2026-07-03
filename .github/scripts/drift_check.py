@@ -26,24 +26,53 @@ CSHARP_SOURCES = {
     "TimeSpanTests.cs": "https://raw.githubusercontent.com/dotnet/runtime/main/src/libraries/System.Runtime/tests/System.Runtime.Tests/System/TimeSpanTests.cs",
 }
 
-SYSTEM_PROMPT = """\
+SCAN_SYSTEM_PROMPT = """\
 You audit a Rust crate (cs-timespan) that intentionally replicates the exact \
 parsing/formatting/arithmetic behavior of C# System.TimeSpan, for migration/interop \
 use. You are given the current Rust source and the current upstream C# TimeSpan \
-source and tests. Find concrete behavioral gaps: methods, constants, format \
-specifiers, parse formats, or edge-case behaviors present in C# but missing or \
-differently-behaved in Rust.
+source and tests.
+
+List CANDIDATE behavioral gaps worth investigating further: methods, constants, \
+format specifiers, parse formats, or edge-case behaviors present in C# that might \
+be missing or differently-behaved in Rust. You do NOT need to fully verify each \
+one here — a separate, isolated pass will independently confirm or reject every \
+candidate you list before anything is filed, so err on the side of listing a \
+candidate if you're unsure rather than trying to fully trace it yourself here.
 
 Ignore naming/style differences, internal implementation details, and anything \
 that is a deliberate, reasonable design choice for a Rust port (e.g. error types, \
-ownership, idiomatic Rust API shape). Only report things that would cause a Rust \
-caller to get a different externally-observable result than the equivalent C# call.
+ownership, idiomatic Rust API shape). Only list things that could plausibly cause \
+a Rust caller to get a different externally-observable result than the equivalent \
+C# call.
 
 Respond with ONLY a JSON array, no prose, no markdown fences. Each element:
 {"title": "<short imperative title, under 80 chars>",
- "body": "<markdown explanation citing the relevant C# snippet and what's missing \
-or different in Rust>"}
-Return an empty array [] if you find nothing.
+ "hint": "<1-3 sentences pointing at the specific C# behavior/citation and the \
+Rust code location to compare it against>"}
+Return an empty array [] if you find nothing plausible.
+"""
+
+VERIFY_SYSTEM_PROMPT = """\
+You are independently verifying ONE candidate behavioral gap between a Rust crate \
+(cs-timespan, which intentionally replicates C# System.TimeSpan exactly) and the \
+upstream C# TimeSpan implementation. You have not seen any other candidates from \
+this run, and should not assume the candidate's premise is correct — do your own \
+trace of the specific behavior it describes.
+
+Determine whether Rust's current behavior actually diverges from C#'s for this \
+specific case. You must be able to state a concrete input where Rust's observable \
+result differs from C#'s to confirm a gap. If your own trace concludes Rust's \
+behavior already matches C# (even if the candidate's title claims otherwise), you \
+MUST reject it — a suggestive title is never sufficient on its own.
+
+Also reject the candidate if it matches an already-accepted-as-intentional \
+divergence listed below, even under different wording.
+
+Respond with ONLY a JSON object, no prose, no markdown fences:
+- Confirmed: {"confirmed": true, "title": "<short imperative title, under 80 chars>", \
+"body": "<markdown explanation citing the relevant C# snippet and the specific \
+input/expected/actual values that differ>"}
+- Rejected: {"confirmed": false, "reason": "<one sentence why>"}
 """
 
 
@@ -68,11 +97,11 @@ def existing_drift_titles() -> set[str]:
     return {item["title"] for item in json.loads(out.stdout)}
 
 
-def call_claude(user_prompt: str) -> str:
+def call_claude(system_prompt: str, user_prompt: str) -> str:
     body = json.dumps({
         "model": MODEL,
         "max_tokens": 8000,
-        "system": SYSTEM_PROMPT,
+        "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -89,6 +118,43 @@ def call_claude(user_prompt: str) -> str:
     return "".join(block["text"] for block in data["content"] if block["type"] == "text")
 
 
+def parse_json_response(raw: str, label: str) -> object:
+    try:
+        return json.loads(raw.strip())
+    except json.JSONDecodeError:
+        print(f"Claude did not return valid JSON ({label}):", file=sys.stderr)
+        print(raw, file=sys.stderr)
+        sys.exit(1)
+
+
+def scan_candidates(rust_blob: str, csharp_blob: str, known: set[str], ignore_notes: str) -> list[dict]:
+    user_prompt = (
+        f"Already-filed gaps (do not repeat these, by title):\n"
+        f"{json.dumps(sorted(known))}\n\n"
+        f"Accepted-as-intentional divergences (do NOT list candidates matching "
+        f"these, even under a different title):\n{ignore_notes}\n\n"
+        f"--- RUST SOURCE ---\n{rust_blob}\n\n"
+        f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
+    )
+    raw = call_claude(SCAN_SYSTEM_PROMPT, user_prompt)
+    return parse_json_response(raw, "scan")
+
+
+def verify_candidate(
+    candidate: dict, rust_blob: str, csharp_blob: str, ignore_notes: str
+) -> dict:
+    user_prompt = (
+        f"Candidate to verify:\n"
+        f"{json.dumps({'title': candidate['title'], 'hint': candidate.get('hint', '')})}\n\n"
+        f"Accepted-as-intentional divergences (reject the candidate if it matches "
+        f"one of these, even under different wording):\n{ignore_notes}\n\n"
+        f"--- RUST SOURCE ---\n{rust_blob}\n\n"
+        f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
+    )
+    raw = call_claude(VERIFY_SYSTEM_PROMPT, user_prompt)
+    return parse_json_response(raw, f"verify: {candidate['title']}")
+
+
 def main() -> None:
     rust_blob = "\n\n".join(
         f"// ===== {path} =====\n{read_local(path)}" for path in RUST_FILES
@@ -99,39 +165,38 @@ def main() -> None:
     known = existing_drift_titles()
     ignore_notes = read_local(IGNORE_FILE) if os.path.exists(IGNORE_FILE) else ""
 
-    user_prompt = (
-        f"Already-filed gaps (do not repeat these, by title):\n"
-        f"{json.dumps(sorted(known))}\n\n"
-        f"Accepted-as-intentional divergences (do NOT report gaps matching these, "
-        f"even under a different title):\n{ignore_notes}\n\n"
-        f"--- RUST SOURCE ---\n{rust_blob}\n\n"
-        f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
-    )
-
-    raw = call_claude(user_prompt).strip()
-    try:
-        gaps = json.loads(raw)
-    except json.JSONDecodeError:
-        print("Claude did not return valid JSON:", file=sys.stderr)
-        print(raw, file=sys.stderr)
-        sys.exit(1)
-
-    if not gaps:
-        print("No drift found.")
+    candidates = scan_candidates(rust_blob, csharp_blob, known, ignore_notes)
+    if not candidates:
+        print("No candidates found.")
         return
 
-    if len(gaps) > MAX_ISSUES_PER_RUN:
+    if len(candidates) > MAX_ISSUES_PER_RUN:
         print(
-            f"Found {len(gaps)} gaps, capping at {MAX_ISSUES_PER_RUN} for this run.",
+            f"Found {len(candidates)} candidates, capping at {MAX_ISSUES_PER_RUN} "
+            f"for this run.",
             file=sys.stderr,
         )
-        gaps = gaps[:MAX_ISSUES_PER_RUN]
+        candidates = candidates[:MAX_ISSUES_PER_RUN]
 
-    for gap in gaps:
-        title = gap["title"].strip()
+    filed = 0
+    for candidate in candidates:
+        title = candidate["title"].strip()
         if title in known:
             continue
-        body = gap["body"] + "\n\n---\n_Filed automatically by the C# drift-check workflow._"
+
+        # Each candidate is verified in its own isolated call — no shared context
+        # with the scan pass or with any other candidate — so an earlier finding
+        # can't bias whether this one gets confirmed.
+        verdict = verify_candidate(candidate, rust_blob, csharp_blob, ignore_notes)
+
+        if not verdict.get("confirmed"):
+            print(f"Rejected: {title} ({verdict.get('reason', 'no reason given')})")
+            continue
+
+        title = verdict["title"].strip()
+        if title in known:
+            continue
+        body = verdict["body"] + "\n\n---\n_Filed automatically by the C# drift-check workflow._"
         subprocess.run(
             [
                 "gh", "issue", "create", "--repo", REPO, "--label", LABEL,
@@ -140,6 +205,10 @@ def main() -> None:
             check=True,
         )
         print(f"Filed: {title}")
+        filed += 1
+
+    if filed == 0:
+        print("No drift confirmed after verification.")
 
 
 if __name__ == "__main__":
