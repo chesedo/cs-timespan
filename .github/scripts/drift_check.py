@@ -13,7 +13,7 @@ import urllib.request
 
 REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5"
 MAX_ISSUES_PER_RUN = 15
 
 RUST_FILES = ["src/lib.rs", "src/parse.rs", "src/fmt.rs"]
@@ -127,6 +127,12 @@ def parse_json_response(raw: str, label: str) -> object:
         sys.exit(1)
 
 
+def fail_schema(label: str, data: object) -> None:
+    print(f"Claude's response for {label} didn't match the expected schema:", file=sys.stderr)
+    print(json.dumps(data), file=sys.stderr)
+    sys.exit(1)
+
+
 def scan_candidates(rust_blob: str, csharp_blob: str, known: set[str], ignore_notes: str) -> list[dict]:
     user_prompt = (
         f"Already-filed gaps (do not repeat these, by title):\n"
@@ -137,7 +143,12 @@ def scan_candidates(rust_blob: str, csharp_blob: str, known: set[str], ignore_no
         f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
     )
     raw = call_claude(SCAN_SYSTEM_PROMPT, user_prompt)
-    return parse_json_response(raw, "scan")
+    data = parse_json_response(raw, "scan")
+    if not isinstance(data, list) or not all(
+        isinstance(item, dict) and isinstance(item.get("title"), str) for item in data
+    ):
+        fail_schema("scan (expected a JSON array of {'title': str, ...})", data)
+    return data
 
 
 def verify_candidate(
@@ -152,7 +163,27 @@ def verify_candidate(
         f"--- C# SOURCE/TESTS ---\n{csharp_blob}"
     )
     raw = call_claude(VERIFY_SYSTEM_PROMPT, user_prompt)
-    return parse_json_response(raw, f"verify: {candidate['title']}")
+    label = f"verify: {candidate['title']}"
+    data = parse_json_response(raw, label)
+    if not isinstance(data, dict) or not isinstance(data.get("confirmed"), bool):
+        fail_schema(f"{label} (expected an object with a boolean 'confirmed')", data)
+    if data["confirmed"] and not (
+        isinstance(data.get("title"), str) and isinstance(data.get("body"), str)
+    ):
+        fail_schema(f"{label} (confirmed=true requires string 'title'/'body')", data)
+    return data
+
+
+def dedupe_candidates(candidates: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    deduped = []
+    for candidate in candidates:
+        key = candidate["title"].strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
 
 
 def main() -> None:
@@ -169,6 +200,8 @@ def main() -> None:
     if not candidates:
         print("No candidates found.")
         return
+
+    candidates = dedupe_candidates(candidates)
 
     if len(candidates) > MAX_ISSUES_PER_RUN:
         print(
