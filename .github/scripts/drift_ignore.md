@@ -9,3 +9,11 @@ scanner turns out to be out of scope, instead of just closing the issue.
 
 Format: one "### <short label>" heading per entry, with a one-paragraph reason.
 -->
+
+### `TimeSpan(days, hours, minutes, seconds)` constructor argument order
+
+The 4-arg C# constructor is `TimeSpan(int days, int hours, int minutes, int
+seconds)` — the first argument is **days**, not hours. When a cited test row
+constructs the expected value this way, derive it from the argument positions
+directly: `new TimeSpan(24, 0, 0, 0)` is 24 days, not "24 hours." Caused issue
+#9.
