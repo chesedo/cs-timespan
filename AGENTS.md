@@ -12,6 +12,23 @@ C#-incompatible API just for stability. Don't bump the crate version for this �
 version stays at `0.1.0` until the crate is actually published; only bump it
 once it is.
 
+## Never fabricate data
+
+If a fetch, read, or lookup fails or comes back empty (404, empty body,
+timeout), say so and stop — never invent plausible-looking content to fill
+the gap. This applies especially to C# source: don't reconstruct a function
+from memory/guesswork and present it as fetched.
+
+Same rule if the source IS reachable but something's off: missing code, or
+C# behavior that contradicts its own docs. Say so explicitly instead of
+picking one side quietly.
+
+(A prior session's C# source fetch 404'd — wrong URL — got back an explicit
+"response body was not retrieved," and fabricated a `TryTimeToTicks` function
+body anyway, inventing a C# behavior that doesn't exist. That shipped as a
+real bug plus two wrong tests, and survived a later citation-audit pass
+uncaught. See commit `2165f39`.)
+
 ## C# source citations
 
 When implementing a fix that mirrors specific C# `TimeSpan` behavior, cite the
@@ -28,6 +45,19 @@ The same applies when a Rust test is duplicating a specific C# test case (e.g.
 from `TimeSpanTests.cs`): cite the file and line(s) of the test being mirrored,
 directly above the test function, so it's clear which upstream case is being
 reproduced and easy to check if that case changes.
+
+### Verify citations before trusting them
+
+A citation is a claim, not a proof. Before relying on one — reading an
+existing one or adding a new one — confirm both:
+1. It's reachable: fetch the URL/file and line, don't assume it exists.
+2. It supports the claim: the cited C# actually says what the comment/test
+   claims, and the Rust code actually behaves that way. Prove it empirically
+   where feasible (a throwaway test).
+
+When auditing citations in bulk, have a subagent independently re-verify each
+one against live upstream source rather than trusting an earlier summary —
+a wrong claim, once written up, tends to get carried forward unchecked.
 
 ## Test coverage parity
 
