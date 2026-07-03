@@ -17,6 +17,7 @@ import urllib.request
 REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
 MODEL = "claude-sonnet-5"
+MAX_TOKENS = 32000
 MAX_ISSUES_PER_RUN = 15
 DRY_RUN = "--dry-run" in sys.argv
 
@@ -106,7 +107,7 @@ def existing_drift_titles() -> set[str]:
 def call_claude(system_prompt: str, user_prompt: str) -> str:
     body = json.dumps({
         "model": MODEL,
-        "max_tokens": 8000,
+        "max_tokens": MAX_TOKENS,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
     }).encode("utf-8")
@@ -123,11 +124,15 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
         data = json.loads(resp.read().decode("utf-8"))
     if data.get("stop_reason") == "max_tokens":
         print(
-            "Warning: response was cut off (hit max_tokens). The JSON below is "
-            "likely incomplete — consider raising max_tokens in call_claude().",
+            f"Warning: response was cut off (hit max_tokens={MAX_TOKENS}). The "
+            f"JSON below is likely incomplete — consider raising MAX_TOKENS.",
             file=sys.stderr,
         )
-    return "".join(block["text"] for block in data["content"] if block["type"] == "text")
+    text = "".join(block["text"] for block in data["content"] if block["type"] == "text")
+    if not text.strip():
+        print("Warning: no text content in Claude's response. Full response:", file=sys.stderr)
+        print(json.dumps(data, indent=2), file=sys.stderr)
+    return text
 
 
 def parse_json_response(raw: str, label: str) -> object:
