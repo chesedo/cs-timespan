@@ -3,6 +3,9 @@
 source/tests and file a GitHub issue for each behavioral gap found.
 
 Requires ANTHROPIC_API_KEY and GH_TOKEN in the environment, and the gh CLI.
+
+Pass --dry-run to run the full scan/verify pipeline without filing anything —
+confirmed gaps are printed instead of created as GitHub issues.
 """
 
 import json
@@ -15,6 +18,7 @@ REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
 MODEL = "claude-sonnet-5"
 MAX_ISSUES_PER_RUN = 15
+DRY_RUN = "--dry-run" in sys.argv
 
 RUST_FILES = ["src/lib.rs", "src/parse.rs", "src/fmt.rs"]
 IGNORE_FILE = os.path.join(os.path.dirname(__file__), "drift_ignore.md")
@@ -212,14 +216,18 @@ def main() -> None:
         if title in known:
             continue
         body = verdict["body"] + "\n\n---\n_Filed automatically by the C# drift-check workflow._"
-        subprocess.run(
-            [
-                "gh", "issue", "create", "--repo", REPO, "--label", LABEL,
-                "--title", title, "--body", body,
-            ],
-            check=True,
-        )
-        print(f"Filed: {title}")
+
+        if DRY_RUN:
+            print(f"[dry run] Would file: {title}\n{body}\n")
+        else:
+            subprocess.run(
+                [
+                    "gh", "issue", "create", "--repo", REPO, "--label", LABEL,
+                    "--title", title, "--body", body,
+                ],
+                check=True,
+            )
+            print(f"Filed: {title}")
         filed += 1
 
     if filed == 0:
