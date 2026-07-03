@@ -81,6 +81,7 @@ input/expected/actual values that differ>"}
 
 
 def fetch(url: str) -> str:
+    print(f"Fetching {url} ...", file=sys.stderr)
     with urllib.request.urlopen(url, timeout=30) as resp:
         return resp.read().decode("utf-8")
 
@@ -91,6 +92,7 @@ def read_local(path: str) -> str:
 
 
 def existing_drift_titles() -> set[str]:
+    print("Fetching already-filed drift issues ...", file=sys.stderr)
     out = subprocess.run(
         [
             "gh", "issue", "list", "--repo", REPO, "--label", LABEL,
@@ -138,6 +140,7 @@ def fail_schema(label: str, data: object) -> None:
 
 
 def scan_candidates(rust_blob: str, csharp_blob: str, known: set[str], ignore_notes: str) -> list[dict]:
+    print("Running scan pass (calling Claude) ...", file=sys.stderr)
     user_prompt = (
         f"Already-filed gaps (do not repeat these, by title):\n"
         f"{json.dumps(sorted(known))}\n\n"
@@ -179,6 +182,7 @@ def verify_candidate(
 
 
 def main() -> None:
+    print("Reading local Rust source ...", file=sys.stderr)
     rust_blob = "\n\n".join(
         f"// ===== {path} =====\n{read_local(path)}" for path in RUST_FILES
     )
@@ -192,9 +196,10 @@ def main() -> None:
     if not candidates:
         print("No candidates found.")
         return
+    print(f"Scan found {len(candidates)} candidate(s).", file=sys.stderr)
 
     filed = 0
-    for candidate in candidates:
+    for i, candidate in enumerate(candidates, start=1):
         if filed >= MAX_ISSUES_PER_RUN:
             print(f"Filed {MAX_ISSUES_PER_RUN} issues, stopping for this run.", file=sys.stderr)
             break
@@ -203,6 +208,7 @@ def main() -> None:
         if title in known:
             continue
 
+        print(f"[{i}/{len(candidates)}] {title}", file=sys.stderr)
         # Each candidate is verified in its own isolated call — no shared context
         # with the scan pass or with any other candidate — so an earlier finding
         # can't bias whether this one gets confirmed.
