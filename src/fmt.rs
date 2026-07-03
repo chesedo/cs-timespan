@@ -14,9 +14,14 @@ pub enum FormatErrorKind {
     /// An unrecognised character appeared in the custom format string.
     /// Contains the offending character.
     UnknownSpecifier(char),
+    /// A single-character format string that isn't a recognised standard format
+    /// (`c`/`t`/`T`/`g`/`G`). Contains the offending character.
+    InvalidStandardFormat(char),
     /// A quoted literal (`'...'` or `"..."`) is not closed before end of format.
     UnclosedQuote,
-    /// `%%` or a lone `%` at end of format string.
+    /// `%%`, or a `%` at the end of a multi-character custom format string
+    /// (a lone single-character `"%"` is rejected earlier as
+    /// [`InvalidStandardFormat`](FormatErrorKind::InvalidStandardFormat)).
     InvalidPercent,
     /// A trailing `\` at end of format string with no character to escape.
     TrailingEscape,
@@ -60,6 +65,19 @@ impl std::fmt::Display for FormatError {
                 f,
                 "unrecognised specifier '{ch}'; valid specifiers: d h m s f F"
             )?,
+            FormatErrorKind::InvalidStandardFormat(ch) => {
+                if matches!(ch, 'd' | 'h' | 'm' | 's' | 'f' | 'F') {
+                    writeln!(
+                        f,
+                        "'{ch}' must be prefixed with '%' when used alone (e.g. '%{ch}'); valid standard formats: c t T g G"
+                    )?;
+                } else {
+                    writeln!(
+                        f,
+                        "'{ch}' is not a valid standard format string; valid standard formats: c t T g G"
+                    )?;
+                }
+            }
             FormatErrorKind::UnclosedQuote => writeln!(f, "quoted literal is not closed")?,
             FormatErrorKind::InvalidPercent => writeln!(
                 f,
@@ -172,6 +190,19 @@ impl Components {
     }
 
     fn format_custom(&self, fmt: &str) -> Result<String, FormatError> {
+        // C# Format/TryFormat (TimeSpanFormat.cs): format.Length == 1 is only ever
+        // matched against "c"/"t"/"T"/"g"/"G" (handled by format_timespan's dispatch
+        // before this function is called) — any other single character throws
+        // FormatException without ever reaching FormatCustomized's specifier syntax.
+        let mut probe = fmt.chars();
+        if let (Some(ch), None) = (probe.next(), probe.next()) {
+            return Err(FormatError::new(
+                FormatErrorKind::InvalidStandardFormat(ch),
+                0,
+                fmt,
+            ));
+        }
+
         let mut chars = fmt.chars().peekable();
         let mut out = String::with_capacity(fmt.len());
         let mut pos = 0usize;
@@ -277,8 +308,9 @@ pub(crate) fn format_constant(ticks: i64) -> String {
 
 pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> Result<String, FormatError> {
     let c = Components::from_ticks(ticks);
+    // C# TimeSpanFormat.Format: null/empty format maps to "c" before anything else runs.
     Ok(match fmt {
-        "c" | "t" | "T" => c.format_constant(),
+        "" | "c" | "t" | "T" => c.format_constant(),
         "g" => c.format_general_short(sep),
         "G" => c.format_general_long(sep),
         _ => c.format_custom(fmt)?,
