@@ -53,6 +53,20 @@ fn format_custom_percent_d() {
     assert_eq!(input().to_string_fmt("%d").unwrap(), "142");
 }
 
+// TimeSpanFormat.cs#L26-40: format.Length == 1 is only matched against "c"/"t"/"T"/
+// "g"/"G" — a bare single-letter custom specifier without a "%" prefix throws
+// FormatException in C# rather than being treated as a one-repeat custom format.
+// ToString_InvalidFormat_TestData (TimeSpanTests.cs) includes "F".
+#[test]
+fn format_custom_bare_specifier_without_percent_rejected() {
+    for fmt in ["d", "h", "m", "s", "f", "F"] {
+        assert!(
+            input().to_string_fmt(fmt).is_err(),
+            "expected {fmt:?} to be rejected without a '%' prefix",
+        );
+    }
+}
+
 // TimeSpanTests.cs#L1547
 #[test]
 fn format_custom_dd() {
@@ -389,6 +403,16 @@ fn format_display_equals_c_format() {
     );
 }
 
+// TimeSpanFormat.cs#L20-23: an empty format string maps to "c", same as null in C#
+// (Rust has no null string, so this is the closest equivalent).
+#[test]
+fn format_empty_string_equals_c_format() {
+    assert_eq!(
+        input().to_string_fmt("").unwrap(),
+        input().to_string_fmt("c").unwrap()
+    );
+}
+
 // ── Standard format "g" (general short, culture-sensitive) ────────────────────
 
 // TimeSpanTests.cs#L1594
@@ -535,7 +559,7 @@ fn format_custom_unclosed_quote() {
     );
 }
 
-// TimeSpanFormat.cs#L409-430: "%%" or lone "%" at end of format throws FormatException.
+// TimeSpanFormat.cs#L409-430: "%%" throws FormatException.
 #[test]
 fn format_custom_invalid_percent() {
     assert_eq!(
@@ -544,20 +568,22 @@ fn format_custom_invalid_percent() {
   "%%"
    ^"#
     );
+}
+
+// TimeSpanFormat.cs#L26-40: a length-1 format string that isn't "c"/"t"/"T"/"g"/"G"
+// throws FormatException before ever reaching FormatCustomized's specifier syntax —
+// a lone "%" or "\" never gets far enough to hit their own dedicated error messages.
+#[test]
+fn format_custom_single_char_not_standard_rejected() {
     assert_eq!(
         input().to_string_fmt("%").unwrap_err().to_string(),
-        r#"'%' must be followed by a single specifier (d h m s f F)
+        r#"unrecognised specifier '%'; valid specifiers: d h m s f F
   "%"
    ^"#
     );
-}
-
-// TimeSpanFormat.cs#L431-448: trailing '\' with no following char throws FormatException.
-#[test]
-fn format_custom_trailing_escape() {
     assert_eq!(
         input().to_string_fmt(r"\").unwrap_err().to_string(),
-        r#"trailing '\' must be followed by a character to escape
+        r#"unrecognised specifier '\'; valid specifiers: d h m s f F
   "\"
    ^"#
     );
