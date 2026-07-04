@@ -78,13 +78,9 @@ If the user picks "skip," stop here.
    issue describes — a test that passes vacuously against buggy code isn't
    proving anything. Commit the failing test on its own, e.g.
    `test: add failing regression test for #<number>`.
-4. Implement the fix, following this repo's conventions (raw strings
-   `r#"..."#` for multiline expected values; no comments unless they explain
-   a non-obvious *why*; this crate is unpublished, so breaking API changes
-   are fine — don't add compat shims).
-5. Run `cargo fmt` (quick local pass), then `nix flake check` — this is what CI
-   runs (fmt, clippy with `--all-features -D warnings`, and test with
-   `--all-features`), so it must pass clean before proceeding. Confirm the
+4. Implement the fix (repo-wide conventions are in `AGENTS.md` — no need to
+   restate them here).
+5. Run `nix flake check` — must pass clean before proceeding. Confirm the
    regression test now passes.
 6. Commit the fix separately from the test commit. Reference the issue in the
    PR body, not the commit subject.
