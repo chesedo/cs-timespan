@@ -141,11 +141,16 @@ def existing_drift_titles() -> set[str]:
 
 
 def call_claude(system_prompt: str, user_prompt: str) -> str:
+    # Streamed: with max_tokens=32000, a non-streaming call can take several
+    # minutes to generate before Anthropic sends a single byte back, and an
+    # idle connection that long gets killed by an intermediate proxy. Streaming
+    # sends periodic SSE events (including keep-alive pings) the whole time.
     body = json.dumps({
         "model": MODEL,
         "max_tokens": MAX_TOKENS,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
+        "stream": True,
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -157,12 +162,26 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
         },
     )
 
-    def do() -> object:
+    def do() -> tuple[str, str | None]:
+        text_parts: list[str] = []
+        stop_reason = None
         with urllib.request.urlopen(req, timeout=600) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            for raw_line in resp:
+                line = raw_line.decode("utf-8").strip()
+                if not line.startswith("data: "):
+                    continue
+                event = json.loads(line[len("data: "):])
+                event_type = event.get("type")
+                if event_type == "content_block_delta" and event["delta"].get("type") == "text_delta":
+                    text_parts.append(event["delta"]["text"])
+                elif event_type == "message_delta":
+                    stop_reason = event["delta"].get("stop_reason")
+                elif event_type == "error":
+                    raise RuntimeError(event["error"].get("message", "unknown streaming error"))
+        return "".join(text_parts), stop_reason
 
     try:
-        data = with_retries(do)
+        text, stop_reason = with_retries(do)
     except (TimeoutError, socket.timeout):
         print("Anthropic API call timed out (600s) after retries. Try again.", file=sys.stderr)
         sys.exit(1)
@@ -172,16 +191,17 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
     except (urllib.error.URLError, ConnectionError) as e:
         print(f"Anthropic API request failed after retries: {e}", file=sys.stderr)
         sys.exit(1)
-    if data.get("stop_reason") == "max_tokens":
+    except RuntimeError as e:
+        print(f"Anthropic API returned a streaming error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if stop_reason == "max_tokens":
         print(
             f"Warning: response was cut off (hit max_tokens={MAX_TOKENS}). The "
             f"JSON below is likely incomplete — consider raising MAX_TOKENS.",
             file=sys.stderr,
         )
-    text = "".join(block["text"] for block in data["content"] if block["type"] == "text")
     if not text.strip():
-        print("Warning: no text content in Claude's response. Full response:", file=sys.stderr)
-        print(json.dumps(data, indent=2), file=sys.stderr)
+        print("Warning: no text content in Claude's streamed response.", file=sys.stderr)
     return text
 
 
