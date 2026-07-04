@@ -78,8 +78,7 @@ If the user picks "skip," stop here.
    issue describes — a test that passes vacuously against buggy code isn't
    proving anything. Commit the failing test on its own, e.g.
    `test: add failing regression test for #<number>`.
-4. Implement the fix (repo-wide conventions are in `AGENTS.md` — no need to
-   restate them here).
+4. Implement the fix.
 5. Run `nix flake check` — must pass clean before proceeding. Confirm the
    regression test now passes.
 6. Commit the fix separately from the test commit. Reference the issue in the
