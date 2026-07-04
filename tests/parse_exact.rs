@@ -602,6 +602,20 @@ fn parse_exact_invalid_wrong_digit_count() {
     );
 }
 
+// Regression test for #38: a multi-byte UTF-8 char landing inside the exact
+// digit count for a repeated specifier (e.g. "hh") must not panic on the
+// byte-vs-char-boundary mismatch; it should report NonDigit like any other
+// non-digit input.
+#[test]
+fn parse_exact_invalid_multibyte_char_in_exact_digit_field() {
+    assert_eq!(
+        TimeSpan::parse_exact("1é", "hh").unwrap_err().to_string(),
+        r#"unexpected character 'é'; expected a digit
+  "1é"
+    ^"#,
+    );
+}
+
 // TimeSpanTests.cs#L1289, #L1292, #L1295
 #[test]
 fn parse_exact_invalid_triple_specifier() {
