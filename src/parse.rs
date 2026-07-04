@@ -893,10 +893,15 @@ fn read_exact_str<'a>(
     original: &str,
     fmt: &str,
 ) -> Result<&'a str, ParseError> {
-    if inp.len() < n {
+    let bytes = inp.as_bytes();
+    if bytes.len() < n {
         return Err(invalid_structure(fmt, offset_of(original, inp), original));
     }
-    if let Some(i) = inp[..n].bytes().position(|b| !b.is_ascii_digit()) {
+    // Validate on raw bytes before slicing `inp` as a `&str`: a multi-byte UTF-8
+    // char in the first `n` bytes would make `n` land mid-char, which panics on
+    // string slicing. Once every byte in `bytes[..n]` is confirmed ASCII, `n` is
+    // guaranteed to be a valid char boundary (ASCII bytes are always one char).
+    if let Some(i) = bytes[..n].iter().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
             offset_of(original, inp) + i,
