@@ -21,7 +21,12 @@
         commonArgs = { inherit src; };
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        gungraunRunner = pkgs.rustPlatform.buildRustPackage rec {
+        fenixRustPlatform = pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
+
+        gungraunRunner = fenixRustPlatform.buildRustPackage rec {
           pname = "gungraun-runner";
           version = "0.19.3";
           src = pkgs.fetchCrate {
