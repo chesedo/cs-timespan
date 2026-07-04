@@ -73,15 +73,22 @@ If the user picks "skip," stop here.
 
 1. Make sure `main` is up to date: `git checkout main && git pull`.
 2. Branch: `git checkout -b issue-<number>-<short-slug>`.
-3. Implement the fix. Follow this repo's conventions: no comments unless they
-   explain a non-obvious *why*; add/extend tests covering the gap (raw strings
-   `r#"..."#` for multiline expected values); this crate is unpublished, so
-   breaking API changes are fine — don't add compat shims.
-4. Run `cargo fmt` (quick local pass), then `nix flake check` — this is what CI
+3. Write the regression test(s) first, against the *unfixed* code. Follow this
+   repo's conventions: raw strings `r#"..."#` for multiline expected values.
+   Run just that test and confirm it actually fails (or panics) for the reason
+   the issue describes — a test that passes vacuously against buggy code isn't
+   proving anything. Commit the failing test on its own, e.g.
+   `test: add failing regression test for #<number>`.
+4. Implement the fix. Follow this repo's conventions: no comments unless they
+   explain a non-obvious *why*; this crate is unpublished, so breaking API
+   changes are fine — don't add compat shims.
+5. Run `cargo fmt` (quick local pass), then `nix flake check` — this is what CI
    runs (fmt, clippy with `--all-features -D warnings`, and test with
-   `--all-features`), so it must pass clean before proceeding.
-5. Commit. Reference the issue in the PR body, not the commit subject.
-6. Push the branch and open the PR:
+   `--all-features`), so it must pass clean before proceeding. Confirm the
+   regression test now passes.
+6. Commit the fix separately from the test commit. Reference the issue in the
+   PR body, not the commit subject.
+7. Push the branch and open the PR:
    ```bash
    gh pr create --repo chesedo/cs-timespan --title "<title>" --body "$(cat <<'EOF'
    ## Summary
@@ -94,7 +101,7 @@ If the user picks "skip," stop here.
    EOF
    )"
    ```
-7. Report the PR URL to the user.
+8. Report the PR URL to the user.
 
 ## Step 4b — Out-of-scope path
 
