@@ -602,6 +602,39 @@ fn parse_exact_invalid_wrong_digit_count() {
     );
 }
 
+// Regression test for #38: a multi-byte UTF-8 char landing inside the exact
+// digit count for a repeated specifier (e.g. "hh") must not panic on the
+// byte-vs-char-boundary mismatch; it should report NonDigit like any other
+// non-digit input.
+#[test]
+fn parse_exact_invalid_multibyte_char_in_exact_digit_field() {
+    assert_eq!(
+        TimeSpan::parse_exact("1é", "hh").unwrap_err().to_string(),
+        r#"unexpected character 'é'; expected a digit
+  "1é"
+    ^"#,
+    );
+}
+
+// A multi-byte literal separator should still match successfully — #38 was
+// specifically about digit fields slicing past a char boundary, not about
+// literals being unable to contain non-ASCII text.
+#[test]
+fn parse_exact_multibyte_escaped_literal_separator() {
+    assert_eq!(
+        TimeSpan::parse_exact("12😀34", r"hh\😀mm"),
+        Ok(ts3(12, 34, 0)),
+    );
+}
+
+#[test]
+fn parse_exact_multibyte_quoted_literal_separator() {
+    assert_eq!(
+        TimeSpan::parse_exact("12😀 minutes34", r#"hh"😀 minutes"mm"#),
+        Ok(ts3(12, 34, 0)),
+    );
+}
+
 // TimeSpanTests.cs#L1289, #L1292, #L1295
 #[test]
 fn parse_exact_invalid_triple_specifier() {
