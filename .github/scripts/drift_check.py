@@ -151,6 +151,7 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
         "stream": True,
+        "thinking": {"type": "disabled"},
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -165,6 +166,7 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
     def do() -> tuple[str, str | None]:
         text_parts: list[str] = []
         stop_reason = None
+        block_types: list[str] = []
         with urllib.request.urlopen(req, timeout=600) as resp:
             for raw_line in resp:
                 line = raw_line.decode("utf-8").strip()
@@ -172,13 +174,18 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
                     continue
                 event = json.loads(line[len("data: "):])
                 event_type = event.get("type")
-                if event_type == "content_block_delta" and event["delta"].get("type") == "text_delta":
+                if event_type == "content_block_start":
+                    block_types.append(event["content_block"]["type"])
+                elif event_type == "content_block_delta" and event["delta"].get("type") == "text_delta":
                     text_parts.append(event["delta"]["text"])
                 elif event_type == "message_delta":
                     stop_reason = event["delta"].get("stop_reason")
                 elif event_type == "error":
                     raise RuntimeError(event["error"].get("message", "unknown streaming error"))
-        return "".join(text_parts), stop_reason
+        text = "".join(text_parts)
+        if not text.strip() and block_types:
+            print(f"Debug: stream produced no text; content block types seen: {block_types}", file=sys.stderr)
+        return text, stop_reason
 
     try:
         text, stop_reason = with_retries(do)
