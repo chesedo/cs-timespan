@@ -24,6 +24,7 @@ REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
 MODEL = "claude-sonnet-5"
 MAX_TOKENS = 32000
+THINKING_EFFORT = "high"
 MAX_ISSUES_PER_RUN = 15
 DRY_RUN = "--dry-run" in sys.argv
 
@@ -38,6 +39,12 @@ CSHARP_SOURCES = {
 }
 
 SCAN_SYSTEM_PROMPT = """\
+CRITICAL OUTPUT RULE, read this first: your reply is fed straight into a JSON \
+parser, never read by a person. The first character you output must be [ and the \
+last must be ]. No ``` or ```json code fence, no prose before or after. Wrapping \
+the JSON in a fence or adding a sentence of commentary breaks the parser and \
+silently discards every finding in your reply — so don't do it, even out of habit.
+
 You audit a Rust crate (cs-timespan) that intentionally replicates the exact \
 parsing/formatting/arithmetic behavior of C# System.TimeSpan, for migration/interop \
 use. You are given the current Rust source and the current upstream C# TimeSpan \
@@ -62,12 +69,17 @@ Respond with ONLY a JSON array. Each element:
 Rust code location to compare it against>"}
 Return an empty array [] if you find nothing plausible.
 
-Your entire reply must be raw JSON, nothing else: no prose before or after, and \
-no ``` or ```json markdown code fences. The first character of your reply must \
-be [ and the last character must be ].
+Reminder: raw JSON only, no ``` fence, no prose. Start your reply with [ right now.
 """
 
 VERIFY_SYSTEM_PROMPT = """\
+CRITICAL OUTPUT RULE, read this first: your reply is fed straight into a JSON \
+parser, never read by a person. The first character you output must be { and the \
+last must be }. No ``` or ```json code fence, no prose before or after, no \
+step-by-step trace written outside the JSON. Any reasoning you want to keep goes \
+inside the JSON's "reason"/"body" field — writing it as a preamble breaks the \
+parser and silently discards the finding, so don't do it, even out of habit.
+
 You are independently verifying ONE candidate behavioral gap between a Rust crate \
 (cs-timespan, which intentionally replicates C# System.TimeSpan exactly) and the \
 upstream C# TimeSpan implementation. You have not seen any other candidates from \
@@ -81,7 +93,7 @@ behavior already matches C# (even if the candidate's title claims otherwise), yo
 MUST reject it — a suggestive title is never sufficient on its own.
 
 Also reject the candidate if it matches an already-accepted-as-intentional \
-divergence listed below, even under different wording.
+divergence listed below, even under different wording. Do your trace silently.
 
 Respond with ONLY a JSON object:
 - Confirmed: {"confirmed": true, "title": "<short imperative title, under 80 chars>", \
@@ -89,9 +101,7 @@ Respond with ONLY a JSON object:
 input/expected/actual values that differ>"}
 - Rejected: {"confirmed": false, "reason": "<one sentence why>"}
 
-Your entire reply must be raw JSON, nothing else: no prose before or after, and \
-no ``` or ```json markdown code fences. The first character of your reply must \
-be { and the last character must be }.
+Reminder: raw JSON only, no ``` fence, no prose. Start your reply with { right now.
 """
 
 
@@ -145,13 +155,18 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
     # minutes to generate before Anthropic sends a single byte back, and an
     # idle connection that long gets killed by an intermediate proxy. Streaming
     # sends periodic SSE events (including keep-alive pings) the whole time.
+    # Thinking is enabled rather than disabled: without it, the model has no
+    # outlet for genuinely hard multi-step reasoning (e.g. tracing float-to-int
+    # cast semantics) and ends up writing that reasoning into the visible answer
+    # as prose before the JSON, breaking the parser.
     body = json.dumps({
         "model": MODEL,
         "max_tokens": MAX_TOKENS,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
         "stream": True,
-        "thinking": {"type": "disabled"},
+        "thinking": {"type": "adaptive"},
+        "output_config": {"effort": THINKING_EFFORT},
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
