@@ -13,8 +13,12 @@ import os
 import socket
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
 
 REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
@@ -91,10 +95,32 @@ be { and the last character must be }.
 """
 
 
+RETRYABLE_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError, socket.timeout)
+
+
+def with_retries(fn: Callable[[], T], *, attempts: int = 3, base_delay: float = 5) -> T:
+    """Retry fn() on transient network errors, since raw.githubusercontent.com and
+    the Anthropic API both occasionally drop a connection or 404 for a moment."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except RETRYABLE_ERRORS as e:
+            if attempt == attempts:
+                raise
+            delay = base_delay * attempt
+            print(f"Attempt {attempt}/{attempts} failed ({e}); retrying in {delay}s ...", file=sys.stderr)
+            time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
 def fetch(url: str) -> str:
     print(f"Fetching {url} ...", file=sys.stderr)
-    with urllib.request.urlopen(url, timeout=30) as resp:
-        return resp.read().decode("utf-8")
+
+    def do() -> str:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            return resp.read().decode("utf-8")
+
+    return with_retries(do)
 
 
 def read_local(path: str) -> str:
@@ -130,14 +156,21 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
             "anthropic-version": "2023-06-01",
         },
     )
-    try:
+
+    def do() -> object:
         with urllib.request.urlopen(req, timeout=600) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        data = with_retries(do)
     except (TimeoutError, socket.timeout):
-        print("Anthropic API call timed out (600s). Try again.", file=sys.stderr)
+        print("Anthropic API call timed out (600s) after retries. Try again.", file=sys.stderr)
         sys.exit(1)
     except urllib.error.HTTPError as e:
         print(f"Anthropic API returned HTTP {e.code}: {e.read().decode('utf-8')}", file=sys.stderr)
+        sys.exit(1)
+    except (urllib.error.URLError, ConnectionError) as e:
+        print(f"Anthropic API request failed after retries: {e}", file=sys.stderr)
         sys.exit(1)
     if data.get("stop_reason") == "max_tokens":
         print(
