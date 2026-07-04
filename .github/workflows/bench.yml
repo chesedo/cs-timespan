@@ -1,0 +1,52 @@
+name: Benchmark regression check
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/bench.yml"
+
+jobs:
+  gungraun:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: DeterminateSystems/nix-installer-action@v12
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Benchmark base branch
+        run: |
+          git worktree add /tmp/base "${{ github.event.pull_request.base.sha }}"
+          nix develop --command cargo bench --manifest-path /tmp/base/Cargo.toml --bench parse_gungraun --bench format_gungraun -- --save-baseline=base
+
+      # Instruction counts from gungraun (valgrind/callgrind) are deterministic
+      # regardless of runner noise, so a same-job base-vs-head diff needs no
+      # statistical smoothing: any change over the soft_limits threshold set in
+      # benches/*_gungraun.rs is a real regression, not noise, and fails this job.
+      - name: Benchmark PR head and compare against base
+        run: |
+          set +e
+          nix develop --command cargo bench --bench parse_gungraun --bench format_gungraun -- --baseline=base 2>&1 | tee /tmp/gungraun-output.txt
+          status="${PIPESTATUS[0]}"
+          set -e
+
+          {
+            echo "## Gungraun benchmark comparison (PR head vs base)"
+            echo
+            echo '```'
+            cat /tmp/gungraun-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"
