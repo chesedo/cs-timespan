@@ -20,7 +20,25 @@
         src = craneLib.cleanCargoSource ./.;
         commonArgs = { inherit src; };
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        fenixRustPlatform = pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
+
+        gungraunRunner = fenixRustPlatform.buildRustPackage rec {
+          pname = "gungraun-runner";
+          version = "0.19.3";
+          src = pkgs.fetchCrate {
+            inherit pname version;
+            hash = "sha256-YubsNYBJuENEvaOGXh9yGg8DWqzA92lujsHthAwypRw=";
+          };
+          cargoHash = "sha256-KMA5v7ogN1fKlM6Jz4iXgYl5NDk0XdB/4KIbihKxs84=";
+          doCheck = false;
+        };
       in {
+        packages.gungraun-runner = gungraunRunner;
+
         checks = {
           fmt = craneLib.cargoFmt { inherit src; };
 
@@ -37,6 +55,7 @@
 
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
+          packages = [ pkgs.valgrind gungraunRunner ];
         };
       });
 }
