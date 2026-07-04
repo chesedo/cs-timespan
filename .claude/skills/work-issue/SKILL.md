@@ -77,7 +77,7 @@ If the user picks "skip," stop here.
    that test and confirm it actually fails (or panics) for the reason the
    issue describes — a test that passes vacuously against buggy code isn't
    proving anything. Commit the failing test on its own, e.g.
-   `test: add failing regression test for #<number>`.
+   `test: add failing regression test for <short description>`.
 4. Implement the fix.
 5. Run `nix flake check` — must pass clean before proceeding. Confirm the
    regression test now passes.
