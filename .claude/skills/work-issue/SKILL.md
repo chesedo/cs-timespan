@@ -73,15 +73,15 @@ If the user picks "skip," stop here.
 
 1. Make sure `main` is up to date: `git checkout main && git pull`.
 2. Branch: `git checkout -b issue-<number>-<short-slug>`.
-3. Write the regression test(s) first, against the *unfixed* code. Follow this
-   repo's conventions: raw strings `r#"..."#` for multiline expected values.
-   Run just that test and confirm it actually fails (or panics) for the reason
-   the issue describes — a test that passes vacuously against buggy code isn't
+3. Write the regression test(s) first, against the *unfixed* code. Run just
+   that test and confirm it actually fails (or panics) for the reason the
+   issue describes — a test that passes vacuously against buggy code isn't
    proving anything. Commit the failing test on its own, e.g.
    `test: add failing regression test for #<number>`.
-4. Implement the fix. Follow this repo's conventions: no comments unless they
-   explain a non-obvious *why*; this crate is unpublished, so breaking API
-   changes are fine — don't add compat shims.
+4. Implement the fix, following this repo's conventions (raw strings
+   `r#"..."#` for multiline expected values; no comments unless they explain
+   a non-obvious *why*; this crate is unpublished, so breaking API changes
+   are fine — don't add compat shims).
 5. Run `cargo fmt` (quick local pass), then `nix flake check` — this is what CI
    runs (fmt, clippy with `--all-features -D warnings`, and test with
    `--all-features`), so it must pass clean before proceeding. Confirm the
