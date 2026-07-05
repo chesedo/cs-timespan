@@ -8,6 +8,7 @@ Pass --dry-run to run the full scan/verify pipeline without filing anything —
 confirmed gaps are printed instead of created as GitHub issues.
 """
 
+import http.client
 import json
 import os
 import socket
@@ -105,7 +106,10 @@ Reminder: raw JSON only, no ``` fence, no prose. Start your reply with { right n
 """
 
 
-RETRYABLE_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError, socket.timeout)
+RETRYABLE_ERRORS = (
+    urllib.error.URLError, ConnectionError, TimeoutError, socket.timeout,
+    http.client.IncompleteRead,
+)
 
 
 def with_retries(fn: Callable[[], T], *, attempts: int = 3, base_delay: float = 5) -> T:
@@ -187,7 +191,14 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
                 line = raw_line.decode("utf-8").strip()
                 if not line.startswith("data: "):
                     continue
-                event = json.loads(line[len("data: "):])
+                try:
+                    event = json.loads(line[len("data: "):])
+                except json.JSONDecodeError as e:
+                    # A malformed data line means the stream was cut off
+                    # mid-event (e.g. a dropped connection) rather than a
+                    # genuinely bad payload from the API - treat it the same
+                    # as the other transient network failures so it retries.
+                    raise ConnectionError(f"malformed SSE event: {e}") from e
                 event_type = event.get("type")
                 if event_type == "content_block_start":
                     block_types.append(event["content_block"]["type"])
@@ -197,6 +208,8 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
                     stop_reason = event["delta"].get("stop_reason")
                 elif event_type == "error":
                     raise RuntimeError(event["error"].get("message", "unknown streaming error"))
+                elif event_type == "message_stop":
+                    break
         text = "".join(text_parts)
         if not text.strip() and block_types:
             print(f"Debug: stream produced no text; content block types seen: {block_types}", file=sys.stderr)
