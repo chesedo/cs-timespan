@@ -8,6 +8,7 @@ Pass --dry-run to run the full scan/verify pipeline without filing anything —
 confirmed gaps are printed instead of created as GitHub issues.
 """
 
+import http.client
 import json
 import os
 import socket
@@ -24,6 +25,7 @@ REPO = "chesedo/cs-timespan"
 LABEL = "csharp-drift"
 MODEL = "claude-sonnet-5"
 MAX_TOKENS = 32000
+THINKING_EFFORT = "high"
 MAX_ISSUES_PER_RUN = 15
 DRY_RUN = "--dry-run" in sys.argv
 
@@ -38,6 +40,12 @@ CSHARP_SOURCES = {
 }
 
 SCAN_SYSTEM_PROMPT = """\
+CRITICAL OUTPUT RULE, read this first: your reply is fed straight into a JSON \
+parser, never read by a person. The first character you output must be [ and the \
+last must be ]. No ``` or ```json code fence, no prose before or after. Wrapping \
+the JSON in a fence or adding a sentence of commentary breaks the parser and \
+silently discards every finding in your reply — so don't do it, even out of habit.
+
 You audit a Rust crate (cs-timespan) that intentionally replicates the exact \
 parsing/formatting/arithmetic behavior of C# System.TimeSpan, for migration/interop \
 use. You are given the current Rust source and the current upstream C# TimeSpan \
@@ -62,12 +70,17 @@ Respond with ONLY a JSON array. Each element:
 Rust code location to compare it against>"}
 Return an empty array [] if you find nothing plausible.
 
-Your entire reply must be raw JSON, nothing else: no prose before or after, and \
-no ``` or ```json markdown code fences. The first character of your reply must \
-be [ and the last character must be ].
+Reminder: raw JSON only, no ``` fence, no prose. Start your reply with [ right now.
 """
 
 VERIFY_SYSTEM_PROMPT = """\
+CRITICAL OUTPUT RULE, read this first: your reply is fed straight into a JSON \
+parser, never read by a person. The first character you output must be { and the \
+last must be }. No ``` or ```json code fence, no prose before or after, no \
+step-by-step trace written outside the JSON. Any reasoning you want to keep goes \
+inside the JSON's "reason"/"body" field — writing it as a preamble breaks the \
+parser and silently discards the finding, so don't do it, even out of habit.
+
 You are independently verifying ONE candidate behavioral gap between a Rust crate \
 (cs-timespan, which intentionally replicates C# System.TimeSpan exactly) and the \
 upstream C# TimeSpan implementation. You have not seen any other candidates from \
@@ -81,7 +94,7 @@ behavior already matches C# (even if the candidate's title claims otherwise), yo
 MUST reject it — a suggestive title is never sufficient on its own.
 
 Also reject the candidate if it matches an already-accepted-as-intentional \
-divergence listed below, even under different wording.
+divergence listed below, even under different wording. Do your trace silently.
 
 Respond with ONLY a JSON object:
 - Confirmed: {"confirmed": true, "title": "<short imperative title, under 80 chars>", \
@@ -89,13 +102,14 @@ Respond with ONLY a JSON object:
 input/expected/actual values that differ>"}
 - Rejected: {"confirmed": false, "reason": "<one sentence why>"}
 
-Your entire reply must be raw JSON, nothing else: no prose before or after, and \
-no ``` or ```json markdown code fences. The first character of your reply must \
-be { and the last character must be }.
+Reminder: raw JSON only, no ``` fence, no prose. Start your reply with { right now.
 """
 
 
-RETRYABLE_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError, socket.timeout)
+RETRYABLE_ERRORS = (
+    urllib.error.URLError, ConnectionError, TimeoutError, socket.timeout,
+    http.client.IncompleteRead,
+)
 
 
 def with_retries(fn: Callable[[], T], *, attempts: int = 3, base_delay: float = 5) -> T:
@@ -141,11 +155,22 @@ def existing_drift_titles() -> set[str]:
 
 
 def call_claude(system_prompt: str, user_prompt: str) -> str:
+    # Streamed: with max_tokens=32000, a non-streaming call can take several
+    # minutes to generate before Anthropic sends a single byte back, and an
+    # idle connection that long gets killed by an intermediate proxy. Streaming
+    # sends periodic SSE events (including keep-alive pings) the whole time.
+    # Thinking is enabled rather than disabled: without it, the model has no
+    # outlet for genuinely hard multi-step reasoning (e.g. tracing float-to-int
+    # cast semantics) and ends up writing that reasoning into the visible answer
+    # as prose before the JSON, breaking the parser.
     body = json.dumps({
         "model": MODEL,
         "max_tokens": MAX_TOKENS,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_prompt}],
+        "stream": True,
+        "thinking": {"type": "adaptive"},
+        "output_config": {"effort": THINKING_EFFORT},
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -157,12 +182,41 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
         },
     )
 
-    def do() -> object:
+    def do() -> tuple[str, str | None]:
+        text_parts: list[str] = []
+        stop_reason = None
+        block_types: list[str] = []
         with urllib.request.urlopen(req, timeout=600) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            for raw_line in resp:
+                line = raw_line.decode("utf-8").strip()
+                if not line.startswith("data: "):
+                    continue
+                try:
+                    event = json.loads(line[len("data: "):])
+                except json.JSONDecodeError as e:
+                    # A malformed data line means the stream was cut off
+                    # mid-event (e.g. a dropped connection) rather than a
+                    # genuinely bad payload from the API - treat it the same
+                    # as the other transient network failures so it retries.
+                    raise ConnectionError(f"malformed SSE event: {e}") from e
+                event_type = event.get("type")
+                if event_type == "content_block_start":
+                    block_types.append(event["content_block"]["type"])
+                elif event_type == "content_block_delta" and event["delta"].get("type") == "text_delta":
+                    text_parts.append(event["delta"]["text"])
+                elif event_type == "message_delta":
+                    stop_reason = event["delta"].get("stop_reason")
+                elif event_type == "error":
+                    raise RuntimeError(event["error"].get("message", "unknown streaming error"))
+                elif event_type == "message_stop":
+                    break
+        text = "".join(text_parts)
+        if not text.strip() and block_types:
+            print(f"Debug: stream produced no text; content block types seen: {block_types}", file=sys.stderr)
+        return text, stop_reason
 
     try:
-        data = with_retries(do)
+        text, stop_reason = with_retries(do)
     except (TimeoutError, socket.timeout):
         print("Anthropic API call timed out (600s) after retries. Try again.", file=sys.stderr)
         sys.exit(1)
@@ -172,16 +226,17 @@ def call_claude(system_prompt: str, user_prompt: str) -> str:
     except (urllib.error.URLError, ConnectionError) as e:
         print(f"Anthropic API request failed after retries: {e}", file=sys.stderr)
         sys.exit(1)
-    if data.get("stop_reason") == "max_tokens":
+    except RuntimeError as e:
+        print(f"Anthropic API returned a streaming error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if stop_reason == "max_tokens":
         print(
             f"Warning: response was cut off (hit max_tokens={MAX_TOKENS}). The "
             f"JSON below is likely incomplete — consider raising MAX_TOKENS.",
             file=sys.stderr,
         )
-    text = "".join(block["text"] for block in data["content"] if block["type"] == "text")
     if not text.strip():
-        print("Warning: no text content in Claude's response. Full response:", file=sys.stderr)
-        print(json.dumps(data, indent=2), file=sys.stderr)
+        print("Warning: no text content in Claude's streamed response.", file=sys.stderr)
     return text
 
 
