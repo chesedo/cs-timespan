@@ -1060,6 +1060,13 @@ pub struct TimeSpanBuilder {
 
 impl TimeSpanBuilder {
     /// Sets the number of days.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().days(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_DAY));
+    /// ```
     #[must_use]
     pub fn days(mut self, days: i32) -> Self {
         self.days = days;
@@ -1067,6 +1074,13 @@ impl TimeSpanBuilder {
     }
 
     /// Sets the number of hours.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().hours(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR));
+    /// ```
     #[must_use]
     pub fn hours(mut self, hours: i32) -> Self {
         self.hours = hours;
