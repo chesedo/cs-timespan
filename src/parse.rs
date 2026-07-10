@@ -201,34 +201,38 @@ fn parse_component_uint(s: Option<&str>, original: &str, neg: bool) -> Result<u6
         None | Some("") => return Ok(0),
         Some(s) => s,
     };
-    let base = offset_of(original, s);
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
-            base + i,
+            offset_of(original, s) + i,
             original,
         ));
     }
-    let dir = if neg {
-        OverflowKind::TooSmall
-    } else {
-        OverflowKind::TooLarge
-    };
-    s.parse::<u64>().map_err(|_| overflow(dir, base, original))
+    s.parse::<u64>().map_err(|_| {
+        let dir = if neg {
+            OverflowKind::TooSmall
+        } else {
+            OverflowKind::TooLarge
+        };
+        overflow(dir, offset_of(original, s), original)
+    })
 }
 
 fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
     let Some(s) = s else {
         return Ok(0);
     };
-    let base = offset_of(original, s);
     if s.is_empty() {
-        return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
+        return Err(ParseError::new(
+            ParseErrorKind::NonDigit,
+            offset_of(original, s),
+            original,
+        ));
     }
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
-            base + i,
+            offset_of(original, s) + i,
             original,
         ));
     }
@@ -250,7 +254,7 @@ fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u3
         } else {
             OverflowKind::TooLarge
         };
-        return Err(overflow(dir, base, original));
+        return Err(overflow(dir, offset_of(original, s), original));
     }
     if zeroes > 7 {
         return Ok(0);
