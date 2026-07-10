@@ -71,26 +71,9 @@ let ratio = hour / half; // 2.0
 
 ## Format strings
 
-This crate supports the same standard and custom format specifiers as C#:
-
-| Format | Description | Example output |
-|--------|-------------|----------------|
-| `"c"` / `"t"` / `"T"` | Constant, culture-invariant | `1.02:03:04.5678900` |
-| `"g"` | General short, culture-sensitive | `1:2:03:04.56789` |
-| `"G"` | General long, culture-sensitive | `1:02:03:04.5678900` |
-| `d`, `dd`–`dddddddd` | Days component | `1`, `01` |
-| `h` / `hh` | Hours component | `2`, `02` |
-| `m` / `mm` | Minutes component | `3`, `03` |
-| `s` / `ss` | Seconds component | `4`, `04` |
-| `f`–`fffffff` | Sub-second digits (exact count) | `5678900` |
-| `F`–`FFFFFFF` | Sub-second digits (trailing zeros trimmed) | `56789` |
-| `%x` | Single-specifier prefix | `%h` → hours only |
-| `\x` | Literal character escape | `\:` → `:` |
-| `'...'` / `"..."` | Quoted literal | `'min'` → `min` |
-
-Refer to the Microsoft documentation for the full reference:
-- [Standard TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings)
-- [Custom TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings)
+This crate supports the same standard and custom format specifiers as C#. Refer to the Microsoft documentation for the full reference:
+- [Standard TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings) — `"c"`, `"g"`, `"G"`
+- [Custom TimeSpan format strings](https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings) — `d`, `h`, `m`, `s`, `f`/`F`, `%x`, `\x`
 
 ## Locale support
 
