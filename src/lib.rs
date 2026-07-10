@@ -401,6 +401,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_days(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_DAY));
+    /// ```
     pub fn from_days(days: i32) -> Result<Self, TimeSpanOverflow> {
         Self::builder().days(days).build()
     }
@@ -410,6 +416,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_hours(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR));
+    /// ```
     pub fn from_hours(hours: i32) -> Result<Self, TimeSpanOverflow> {
         Self::builder().hours(hours).build()
     }
@@ -419,6 +431,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_minutes(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_MINUTE));
+    /// ```
     pub fn from_minutes(minutes: i64) -> Result<Self, TimeSpanOverflow> {
         Self::builder().minutes(minutes).build()
     }
@@ -428,6 +446,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_seconds(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND));
+    /// ```
     pub fn from_seconds(seconds: i64) -> Result<Self, TimeSpanOverflow> {
         Self::builder().seconds(seconds).build()
     }
@@ -437,6 +461,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_milliseconds(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_MILLISECOND));
+    /// ```
     pub fn from_milliseconds(milliseconds: i64) -> Result<Self, TimeSpanOverflow> {
         Self::builder().milliseconds(milliseconds).build()
     }
@@ -446,6 +476,12 @@ impl TimeSpan {
     /// # Errors
     ///
     /// Returns [`TimeSpanOverflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_microseconds(1).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_MICROSECOND));
+    /// ```
     pub fn from_microseconds(microseconds: i64) -> Result<Self, TimeSpanOverflow> {
         Self::builder().microseconds(microseconds).build()
     }
