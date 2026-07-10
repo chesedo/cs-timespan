@@ -349,6 +349,26 @@ fn parse_invalid_negative_component() {
     );
 }
 
+// str::parse::<u64>() accepts an optional leading '+' on its own (e.g. "+123" -> Ok(123)),
+// which C#'s TimeSpan parsing does not — the digit-only pre-check must reject it before
+// parse::<u64>() ever runs, since parse::<u64>() succeeding wouldn't give us a chance to
+// reject it after the fact.
+#[test]
+fn parse_invalid_leading_plus_component() {
+    assert_eq!(
+        TimeSpan::parse("+12:24:02").unwrap_err().to_string(),
+        r#"unexpected character '+'; expected a digit
+  "+12:24:02"
+   ^"#,
+    );
+    assert_eq!(
+        TimeSpan::parse("00:00:+01").unwrap_err().to_string(),
+        r#"unexpected character '+'; expected a digit
+  "00:00:+01"
+         ^"#,
+    );
+}
+
 // TimeSpanTests.cs#L1116-1118
 #[test]
 fn parse_invalid_embedded_null_chars() {
