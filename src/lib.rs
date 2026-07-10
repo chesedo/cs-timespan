@@ -287,6 +287,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_days_f64(1.0).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_DAY));
+    /// ```
     #[allow(clippy::cast_precision_loss)] // TICKS_PER_DAY magnitude fits f64's mantissa
     pub fn from_days_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_DAY as f64)
@@ -300,6 +306,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_hours_f64(1.0).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR));
+    /// ```
     #[allow(clippy::cast_precision_loss)]
     pub fn from_hours_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_HOUR as f64)
@@ -313,6 +325,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_minutes_f64(1.0).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_MINUTE));
+    /// ```
     #[allow(clippy::cast_precision_loss)]
     pub fn from_minutes_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_MINUTE as f64)
@@ -326,6 +344,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_seconds_f64(1.0).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND));
+    /// ```
     #[allow(clippy::cast_precision_loss)]
     pub fn from_seconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_SECOND as f64)
@@ -339,6 +363,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_milliseconds_f64(1.0).unwrap(), TimeSpan::from_ticks(TimeSpan::TICKS_PER_MILLISECOND));
+    /// ```
     #[allow(clippy::cast_precision_loss)]
     pub fn from_milliseconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, Self::TICKS_PER_MILLISECOND as f64)
@@ -352,6 +382,12 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `value` is NaN, or
     /// [`FloatError::Overflow`] if it's outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// assert_eq!(TimeSpan::from_microseconds_f64(15.0).unwrap().ticks(), 150);
+    /// ```
     pub fn from_microseconds_f64(value: f64) -> Result<Self, FloatError> {
         Self::interval(value, 10.0)
     }
@@ -371,6 +407,13 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `factor` is NaN, or
     /// [`FloatError::Overflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::from_ticks(2 * TimeSpan::TICKS_PER_HOUR + 30 * TimeSpan::TICKS_PER_MINUTE);
+    /// assert_eq!(ts.multiply(2.0), Ok(TimeSpan::from_ticks(5 * TimeSpan::TICKS_PER_HOUR)));
+    /// ```
     pub fn multiply(self, factor: f64) -> Result<Self, FloatError> {
         if factor.is_nan() {
             return Err(FloatError::Nan);
@@ -386,6 +429,13 @@ impl TimeSpan {
     ///
     /// Returns [`FloatError::Nan`] if `divisor` is NaN, or
     /// [`FloatError::Overflow`] if the result is outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::from_ticks(2 * TimeSpan::TICKS_PER_HOUR + 30 * TimeSpan::TICKS_PER_MINUTE);
+    /// assert_eq!(ts.divide(0.5), Ok(TimeSpan::from_ticks(5 * TimeSpan::TICKS_PER_HOUR)));
+    /// ```
     pub fn divide(self, divisor: f64) -> Result<Self, FloatError> {
         if divisor.is_nan() {
             return Err(FloatError::Nan);
@@ -516,36 +566,66 @@ impl TimeSpan {
     }
 
     /// Returns the hours component (-23 to 23) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().hours(), 2);
+    /// ```
     #[must_use]
     pub const fn hours(self) -> i32 {
         (self.ticks / Self::TICKS_PER_HOUR % 24) as i32
     }
 
     /// Returns the minutes component (-59 to 59) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().minutes(), 3);
+    /// ```
     #[must_use]
     pub const fn minutes(self) -> i32 {
         (self.ticks / Self::TICKS_PER_MINUTE % 60) as i32
     }
 
     /// Returns the seconds component (-59 to 59) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04").unwrap().seconds(), 4);
+    /// ```
     #[must_use]
     pub const fn seconds(self) -> i32 {
         (self.ticks / Self::TICKS_PER_SECOND % 60) as i32
     }
 
     /// Returns the milliseconds component (-999 to 999) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04.005006700").unwrap().milliseconds(), 5);
+    /// ```
     #[must_use]
     pub const fn milliseconds(self) -> i32 {
         (self.ticks / Self::TICKS_PER_MILLISECOND % 1000) as i32
     }
 
     /// Returns the microseconds component (-999 to 999) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04.005006700").unwrap().microseconds(), 6);
+    /// ```
     #[must_use]
     pub const fn microseconds(self) -> i32 {
         (self.ticks / Self::TICKS_PER_MICROSECOND % 1000) as i32
     }
 
     /// Returns the nanoseconds component (-900 to 900, in multiples of 100) of the time interval.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// assert_eq!(TimeSpan::parse("1.02:03:04.005006700").unwrap().nanoseconds(), 700);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_possible_truncation)] // (ticks % 10) * 100 is at most 900
     pub const fn nanoseconds(self) -> i32 {
@@ -554,6 +634,14 @@ impl TimeSpan {
 
     // ── Total properties (mirror TotalDays / TotalHours / ...) ────────────────
     /// Returns the total number of days, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 36 hours = 1.5 days
+    /// let ts = TimeSpan::from_ticks(36 * TimeSpan::TICKS_PER_HOUR);
+    /// assert_eq!(ts.total_days(), 1.5);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)] // matches C#'s (double)_ticks precision loss
     pub fn total_days(self) -> f64 {
@@ -561,6 +649,14 @@ impl TimeSpan {
     }
 
     /// Returns the total number of hours, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 90 minutes = 1.5 hours
+    /// let ts = TimeSpan::from_ticks(90 * TimeSpan::TICKS_PER_MINUTE);
+    /// assert_eq!(ts.total_hours(), 1.5);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_hours(self) -> f64 {
@@ -568,6 +664,14 @@ impl TimeSpan {
     }
 
     /// Returns the total number of minutes, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 90 seconds = 1.5 minutes
+    /// let ts = TimeSpan::from_ticks(90 * TimeSpan::TICKS_PER_SECOND);
+    /// assert_eq!(ts.total_minutes(), 1.5);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_minutes(self) -> f64 {
@@ -575,6 +679,14 @@ impl TimeSpan {
     }
 
     /// Returns the total number of seconds, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 1500 milliseconds = 1.5 seconds
+    /// let ts = TimeSpan::from_ticks(1500 * TimeSpan::TICKS_PER_MILLISECOND);
+    /// assert_eq!(ts.total_seconds(), 1.5);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_seconds(self) -> f64 {
@@ -583,6 +695,13 @@ impl TimeSpan {
 
     /// Returns the total number of milliseconds, as a fractional value, clamped
     /// to the range representable by `i64::MIN`/`i64::MAX` ticks.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::from_ticks(15 * TimeSpan::TICKS_PER_MILLISECOND);
+    /// assert_eq!(ts.total_milliseconds(), 15.0);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_milliseconds(self) -> f64 {
@@ -591,6 +710,14 @@ impl TimeSpan {
     }
 
     /// Returns the total number of microseconds, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 150 ticks * 100ns = 15 microseconds
+    /// let ts = TimeSpan::from_ticks(150);
+    /// assert_eq!(ts.total_microseconds(), 15.0);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_microseconds(self) -> f64 {
@@ -598,6 +725,14 @@ impl TimeSpan {
     }
 
     /// Returns the total number of nanoseconds, as a fractional value.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// // 5 ticks * 100ns = 500 nanoseconds
+    /// let ts = TimeSpan::from_ticks(5);
+    /// assert_eq!(ts.total_nanoseconds(), 500.0);
+    /// ```
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn total_nanoseconds(self) -> f64 {
@@ -769,6 +904,14 @@ impl TimeSpan {
     ///
     /// Returns a [`ParseError`] if the string does not match the format, or the value is
     /// outside the representable range.
+    ///
+    /// ```
+    /// use cs_timespan::{TimeSpan, Locale, TimeSpanStyles};
+    ///
+    /// // Without a leading '-' in the input, AssumeNegative flips the sign.
+    /// let ts = TimeSpan::parse_exact_with_styles("1:02:03", r"h\:mm\:ss", Locale::en, TimeSpanStyles::AssumeNegative);
+    /// assert_eq!(ts.unwrap().to_string(), "-01:02:03");
+    /// ```
     pub fn parse_exact_with_styles(
         s: &str,
         fmt: &str,
@@ -919,6 +1062,13 @@ impl TimeSpanBuilder {
     }
 
     /// Sets the number of minutes.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().minutes(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_MINUTE));
+    /// ```
     #[must_use]
     pub fn minutes(mut self, minutes: i64) -> Self {
         self.minutes = minutes;
@@ -926,6 +1076,13 @@ impl TimeSpanBuilder {
     }
 
     /// Sets the number of seconds.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().seconds(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND));
+    /// ```
     #[must_use]
     pub fn seconds(mut self, seconds: i64) -> Self {
         self.seconds = seconds;
@@ -933,6 +1090,13 @@ impl TimeSpanBuilder {
     }
 
     /// Sets the number of milliseconds.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().milliseconds(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_MILLISECOND));
+    /// ```
     #[must_use]
     pub fn milliseconds(mut self, milliseconds: i64) -> Self {
         self.milliseconds = milliseconds;
@@ -940,6 +1104,13 @@ impl TimeSpanBuilder {
     }
 
     /// Sets the number of microseconds.
+    ///
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    ///
+    /// let ts = TimeSpan::builder().microseconds(1).build().unwrap();
+    /// assert_eq!(ts, TimeSpan::from_ticks(TimeSpan::TICKS_PER_MICROSECOND));
+    /// ```
     #[must_use]
     pub fn microseconds(mut self, microseconds: i64) -> Self {
         self.microseconds = microseconds;
@@ -991,6 +1162,12 @@ mod chrono_impls {
     use super::TimeSpan;
     use chrono::TimeDelta;
 
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// use chrono::TimeDelta;
+    ///
+    /// assert_eq!(TimeSpan::from(TimeDelta::seconds(1)), TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND));
+    /// ```
     impl From<TimeDelta> for TimeSpan {
         fn from(delta: TimeDelta) -> Self {
             // num_seconds() and subsec_nanos() together give signed components.
@@ -1001,6 +1178,12 @@ mod chrono_impls {
         }
     }
 
+    /// ```
+    /// use cs_timespan::TimeSpan;
+    /// use chrono::TimeDelta;
+    ///
+    /// assert_eq!(TimeDelta::from(TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND)), TimeDelta::seconds(1));
+    /// ```
     impl From<TimeSpan> for TimeDelta {
         fn from(ts: TimeSpan) -> Self {
             // TimeSpan's range (±29 k years) is contained within TimeDelta's range
@@ -1012,6 +1195,12 @@ mod chrono_impls {
     }
 }
 
+/// ```
+/// use cs_timespan::TimeSpan;
+/// use std::time::Duration;
+///
+/// assert_eq!(TimeSpan::from(Duration::from_secs(1)), TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND));
+/// ```
 impl From<std::time::Duration> for TimeSpan {
     fn from(d: std::time::Duration) -> Self {
         // 1 tick = 100 ns; saturate to MAX_VALUE if Duration exceeds TimeSpan's range.
@@ -1026,6 +1215,12 @@ impl From<std::time::Duration> for TimeSpan {
     }
 }
 
+/// ```
+/// use cs_timespan::TimeSpan;
+/// use std::time::Duration;
+///
+/// assert_eq!(Duration::try_from(TimeSpan::from_ticks(TimeSpan::TICKS_PER_SECOND)), Ok(Duration::from_secs(1)));
+/// ```
 impl TryFrom<TimeSpan> for std::time::Duration {
     type Error = NegativeTimeSpan;
 
