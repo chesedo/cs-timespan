@@ -1329,9 +1329,10 @@ impl std::ops::MulAssign<i64> for TimeSpan {
     }
 }
 
-// TimeSpan.cs#L908-L922: C#'s `operator *(TimeSpan, double)` throws ArgumentException
-// (NaN) or OverflowException (out of range); unlike the `i64` operators above, this
-// can fail, so `Output` is a `Result` instead of panicking.
+// TimeSpan.cs#L908-L922 (operator *) and L925-L934 (operator /): both throw
+// ArgumentException (NaN) or OverflowException (out of range); unlike the `i64`
+// operators above, these can fail, so `Output` is a `Result` instead of panicking.
+// Applies equally to the `Div<f64>` impl below.
 impl std::ops::Mul<f64> for TimeSpan {
     type Output = Result<Self, FloatError>;
 
@@ -1355,8 +1356,6 @@ impl std::ops::Div<i64> for TimeSpan {
     }
 }
 
-// TimeSpan.cs#L925-L934: mirrors C#'s `operator /(TimeSpan, double)`; see the `Mul<f64>`
-// impl above for why `Output` is a `Result`.
 impl std::ops::Div<f64> for TimeSpan {
     type Output = Result<Self, FloatError>;
 
