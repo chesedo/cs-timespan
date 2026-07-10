@@ -197,24 +197,11 @@ impl<'a> Builder<'a> {
 }
 
 fn parse_component_uint(s: Option<&str>, original: &str, neg: bool) -> Result<u64, ParseError> {
-    match s {
-        None | Some("") => Ok(0),
-        Some(s) => parse_uint(s, original, neg),
-    }
-}
-
-fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
-    match s {
-        None => Ok(0),
-        Some(s) => parse_frac(s, original, neg),
-    }
-}
-
-fn parse_uint(s: &str, original: &str, neg: bool) -> Result<u64, ParseError> {
+    let s = match s {
+        None | Some("") => return Ok(0),
+        Some(s) => s,
+    };
     let base = offset_of(original, s);
-    if s.is_empty() {
-        return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
-    }
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
@@ -230,7 +217,10 @@ fn parse_uint(s: &str, original: &str, neg: bool) -> Result<u64, ParseError> {
     s.parse::<u64>().map_err(|_| overflow(dir, base, original))
 }
 
-fn parse_frac(s: &str, original: &str, neg: bool) -> Result<u32, ParseError> {
+fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
+    let Some(s) = s else {
+        return Ok(0);
+    };
     let base = offset_of(original, s);
     if s.is_empty() {
         return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
