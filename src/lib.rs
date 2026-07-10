@@ -388,15 +388,17 @@ impl TimeSpan {
     ///
     /// assert_eq!(TimeSpan::from_microseconds_f64(15.0).unwrap().ticks(), 150);
     /// ```
+    #[allow(clippy::cast_precision_loss)]
     pub fn from_microseconds_f64(value: f64) -> Result<Self, FloatError> {
-        Self::interval(value, 10.0)
+        Self::interval(value, Self::TICKS_PER_MICROSECOND as f64)
     }
 
     // ── Float multiply/divide (mirror TimeSpan.Multiply(double)/Divide(double)) ──
-    // TimeSpan.cs#L689-L691, L908-L934: C# rounds to the nearest tick via
-    // `Math.Round`, which defaults to `MidpointRounding.ToEven` — hence
-    // `round_ties_even()` below rather than `round()` (which breaks ties away
-    // from zero and would diverge from C# on exact half-tick results).
+    // TimeSpan.cs#L689-L691 (Multiply/Divide) forward to the operators at
+    // L908-L934, which round via `Math.Round` — defaulting to
+    // `MidpointRounding.ToEven` — hence `round_ties_even()` below rather than
+    // `round()` (which breaks ties away from zero and would diverge from C#
+    // on exact half-tick results).
     // `Result` is used instead of throwing, per this crate's established
     // convention for anything that can hit NaN/overflow (see `from_days_f64`
     // and friends above).
