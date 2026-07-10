@@ -851,7 +851,8 @@ impl TimeSpan {
     /// Tries each format string in order and returns the first successful parse,
     /// using the invariant culture.
     ///
-    /// Mirrors `TimeSpan.ParseExact` with an array of formats.
+    /// Mirrors `TimeSpan.ParseExact` with an array of formats. Each format
+    /// follows the same syntax as [`parse_exact`](Self::parse_exact).
     ///
     /// # Errors
     ///
@@ -861,6 +862,8 @@ impl TimeSpan {
     }
 
     /// Parses using a specific format and locale decimal separator.
+    ///
+    /// `fmt` follows the same syntax as [`parse_exact`](Self::parse_exact).
     ///
     /// # Errors
     ///
@@ -876,6 +879,8 @@ impl TimeSpan {
 
     /// Tries each format string in order and returns the first successful parse,
     /// using the given locale decimal separator.
+    ///
+    /// Each format follows the same syntax as [`parse_exact`](Self::parse_exact).
     ///
     /// # Errors
     ///
@@ -897,6 +902,7 @@ impl TimeSpan {
 
     /// Parses using a specific format, locale, and [`TimeSpanStyles`].
     ///
+    /// `fmt` follows the same syntax as [`parse_exact`](Self::parse_exact).
     /// [`TimeSpanStyles::AssumeNegative`] negates a positive result, mirroring
     /// the C# overload that accepts `TimeSpanStyles`.
     ///
