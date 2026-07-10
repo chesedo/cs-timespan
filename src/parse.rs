@@ -9,8 +9,10 @@ pub enum OverflowKind {
     Minutes(u64),
     /// Seconds component was ≥ 60; carries the out-of-range value.
     Seconds(u64),
-    /// Total tick value exceeds [`TimeSpan::MAX_VALUE`] or is below [`TimeSpan::MIN_VALUE`].
-    Value,
+    /// Total tick value exceeds [`TimeSpan::MAX_VALUE`].
+    TooLarge,
+    /// Total tick value is below [`TimeSpan::MIN_VALUE`].
+    TooSmall,
 }
 
 /// The category of error returned when a time-span string fails to parse.
@@ -104,8 +106,11 @@ impl std::fmt::Display for ParseError {
                 OverflowKind::Seconds(s) => {
                     writeln!(f, "seconds value {s} is out of range; must be 0-59")?;
                 }
-                OverflowKind::Value => {
-                    writeln!(f, "TimeSpan value is outside the representable range")?;
+                OverflowKind::TooLarge => {
+                    writeln!(f, "TimeSpan value exceeds the maximum representable range")?;
+                }
+                OverflowKind::TooSmall => {
+                    writeln!(f, "TimeSpan value is below the minimum representable range")?;
                 }
             },
         }
@@ -160,11 +165,11 @@ impl<'a> Builder<'a> {
     // seconds >= 60 with OverflowException unconditionally — standard and custom
     // format parsing both route through it, so there's no lenient/normalizing path.
     fn build(self) -> Result<TimeSpan, ParseError> {
-        let days = parse_component_uint(self.days, self.original)?;
-        let h = parse_component_uint(self.hours, self.original)?;
-        let m = parse_component_uint(self.minutes, self.original)?;
-        let sv = parse_component_uint(self.seconds, self.original)?;
-        let frac = parse_component_frac(self.frac, self.original)?;
+        let days = parse_component_uint(self.days, self.original, self.neg)?;
+        let h = parse_component_uint(self.hours, self.original, self.neg)?;
+        let m = parse_component_uint(self.minutes, self.original, self.neg)?;
+        let sv = parse_component_uint(self.seconds, self.original, self.neg)?;
+        let frac = parse_component_frac(self.frac, self.original, self.neg)?;
         if h >= 24 {
             let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
             return Err(overflow(OverflowKind::Hours(h), pos, self.original));
@@ -191,21 +196,21 @@ impl<'a> Builder<'a> {
     }
 }
 
-fn parse_component_uint(s: Option<&str>, original: &str) -> Result<u64, ParseError> {
+fn parse_component_uint(s: Option<&str>, original: &str, neg: bool) -> Result<u64, ParseError> {
     match s {
         None | Some("") => Ok(0),
-        Some(s) => parse_uint(s, original),
+        Some(s) => parse_uint(s, original, neg),
     }
 }
 
-fn parse_component_frac(s: Option<&str>, original: &str) -> Result<u32, ParseError> {
+fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
     match s {
         None => Ok(0),
-        Some(s) => parse_frac(s, original),
+        Some(s) => parse_frac(s, original, neg),
     }
 }
 
-fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
+fn parse_uint(s: &str, original: &str, neg: bool) -> Result<u64, ParseError> {
     let base = offset_of(original, s);
     if s.is_empty() {
         return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
@@ -217,11 +222,15 @@ fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
             original,
         ));
     }
-    s.parse::<u64>()
-        .map_err(|_| overflow(OverflowKind::Value, base, original))
+    let dir = if neg {
+        OverflowKind::TooSmall
+    } else {
+        OverflowKind::TooLarge
+    };
+    s.parse::<u64>().map_err(|_| overflow(dir, base, original))
 }
 
-fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
+fn parse_frac(s: &str, original: &str, neg: bool) -> Result<u32, ParseError> {
     let base = offset_of(original, s);
     if s.is_empty() {
         return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
@@ -246,7 +255,12 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
     // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
     let zeroes = s.bytes().take_while(|&b| b == b'0').count();
     if zeroes == 0 {
-        return Err(overflow(OverflowKind::Value, base, original));
+        let dir = if neg {
+            OverflowKind::TooSmall
+        } else {
+            OverflowKind::TooLarge
+        };
+        return Err(overflow(dir, base, original));
     }
     if zeroes > 7 {
         return Ok(0);
@@ -279,7 +293,16 @@ fn build_ticks(
     frac: u32,
     original: &str,
 ) -> Result<TimeSpan, ParseError> {
-    let ovf = || overflow(OverflowKind::Value, 0, original);
+    // `neg` fully determines direction here: the two range checks below only ever
+    // reject on the side matching the input's own sign.
+    let ovf = || {
+        let dir = if neg {
+            OverflowKind::TooSmall
+        } else {
+            OverflowKind::TooLarge
+        };
+        overflow(dir, 0, original)
+    };
     // h ≤ 23, m ≤ 59, s ≤ 59, frac ≤ 9_999_999: sub ≤ 864_000_000_000 — well within u64
     let sub = u64::from(h) * TimeSpan::TICKS_PER_HOUR.unsigned_abs()
         + u64::from(m) * TimeSpan::TICKS_PER_MINUTE.unsigned_abs()
@@ -429,7 +452,7 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
                     input,
                 ));
             }
-            let first_val = parse_component_uint(Some(first_s), input)?;
+            let first_val = parse_component_uint(Some(first_s), input, neg)?;
             if first_val > 23 {
                 b.days = Some(first_s);
                 b.hours = Some(mid);

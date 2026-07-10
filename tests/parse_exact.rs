@@ -1003,7 +1003,7 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
         TimeSpan::parse_exact("1:07:45:16.99999999", "G")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "1:07:45:16.99999999"
               ^"#,
     );

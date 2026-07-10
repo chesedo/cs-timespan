@@ -427,7 +427,7 @@ fn parse_overflow_too_many_fractional_digits() {
     // No leading zeros: value (99999999) > MaxFraction → Overflow
     assert_eq!(
         TimeSpan::parse("1:1:1.99999999").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "1:1:1.99999999"
          ^"#,
     );
@@ -448,25 +448,25 @@ fn parse_frac_leading_zeros_beyond_7_rounds_to_nearest_tick() {
 fn parse_overflow_days_exceed_max() {
     assert_eq!(
         TimeSpan::parse("2147483647").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "2147483647"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("2147483648").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "2147483648"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("10675200").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675200"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("10675200:00:00").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675200:00:00"
    ^"#,
     );
@@ -479,7 +479,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:03:00:00")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:03:00:00"
    ^"#,
     );
@@ -487,7 +487,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:02:49:00")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:49:00"
    ^"#,
     );
@@ -495,7 +495,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:02:48:06")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:48:06"
    ^"#,
     );
@@ -503,7 +503,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("-10675199:02:48:06")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value is below the minimum representable range
   "-10675199:02:48:06"
    ^"#,
     );
@@ -511,7 +511,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse_with_culture("10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:48:05.4776"
    ^"#,
     );
@@ -519,7 +519,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse_with_culture("-10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value is below the minimum representable range
   "-10675199:02:48:05.4776"
    ^"#,
     );
