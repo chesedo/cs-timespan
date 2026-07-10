@@ -164,7 +164,8 @@ impl Components {
         .unwrap(); // write! to String is infallible
         if self.sub_sec_ticks > 0 {
             // FFFFFFF — trim trailing zeros
-            write!(out, "{}{}", sep, fmt_frac(self.sub_sec_ticks, 7, true)).unwrap(); // write! to String is infallible
+            out.push(sep);
+            fmt_frac(&mut out, self.sub_sec_ticks, 7, true);
         }
         out
     }
@@ -177,15 +178,11 @@ impl Components {
         }
         write!(
             out,
-            "{}:{:02}:{:02}:{:02}{}{}",
-            self.days,
-            self.hours,
-            self.minutes,
-            self.seconds,
-            sep,
-            fmt_frac(self.sub_sec_ticks, 7, false),
+            "{}:{:02}:{:02}:{:02}{}",
+            self.days, self.hours, self.minutes, self.seconds, sep,
         )
         .unwrap(); // write! to String is infallible
+        fmt_frac(&mut out, self.sub_sec_ticks, 7, false);
         out
     }
 
@@ -220,11 +217,8 @@ impl Components {
                     Some(next) => {
                         let spec_pos = pos;
                         pos += 1;
-                        match self.format_specifier(next, 1) {
-                            Some(s) => out.push_str(&s),
-                            None => {
-                                return Err(err(FormatErrorKind::UnknownSpecifier(next), spec_pos));
-                            }
+                        if !self.format_specifier(&mut out, next, 1) {
+                            return Err(err(FormatErrorKind::UnknownSpecifier(next), spec_pos));
                         }
                     }
                 },
@@ -245,8 +239,8 @@ impl Components {
                     if n > max {
                         return Err(err(FormatErrorKind::RepeatTooLong(max), cur + max));
                     }
-                    // ch is a validated specifier — format_specifier always returns Some
-                    out.push_str(&self.format_specifier(ch, n).unwrap());
+                    // ch is a validated specifier — format_specifier always returns true
+                    self.format_specifier(&mut out, ch, n);
                 }
                 // `\x` — escape: next char is a literal.
                 // C# FormatCustomized (TimeSpanFormat.cs): trailing '\' → FormatException.
@@ -278,27 +272,22 @@ impl Components {
         Ok(out)
     }
 
-    /// Emit one component according to its specifier character and repeat count `n`.
-    /// Returns `None` for unrecognised specifier chars.
-    fn format_specifier(&self, ch: char, n: usize) -> Option<String> {
-        Some(match ch {
-            'd' => {
-                let s = self.days.to_string();
-                if s.len() < n {
-                    let mut out = String::new();
-                    write!(out, "{s:0>n$}").unwrap(); // write! to String is infallible
-                    out
-                } else {
-                    s
-                }
-            }
-            'h' => fmt_component(n, self.hours),
-            'm' => fmt_component(n, self.minutes),
-            's' => fmt_component(n, self.seconds),
-            'f' => fmt_frac(self.sub_sec_ticks, n, false),
-            'F' => fmt_frac(self.sub_sec_ticks, n, true),
-            _ => return None,
-        })
+    /// Writes one component, according to its specifier character and repeat count
+    /// `n`, directly into `out`. Returns `false` for unrecognised specifier chars
+    /// (leaving `out` untouched).
+    fn format_specifier(&self, out: &mut String, ch: char, n: usize) -> bool {
+        match ch {
+            // {:0width$} zero-pads to a *minimum* width; it never truncates a value
+            // that's already wider than `n`, which is exactly the desired behavior.
+            'd' => write!(out, "{:0n$}", self.days).unwrap(), // write! to String is infallible
+            'h' => fmt_component(out, n, self.hours),
+            'm' => fmt_component(out, n, self.minutes),
+            's' => fmt_component(out, n, self.seconds),
+            'f' => fmt_frac(out, self.sub_sec_ticks, n, false),
+            'F' => fmt_frac(out, self.sub_sec_ticks, n, true),
+            _ => return false,
+        }
+        true
     }
 }
 
@@ -318,23 +307,29 @@ pub(crate) fn format_timespan(ticks: i64, fmt: &str, sep: char) -> Result<String
 }
 
 /// `n == 1` → no leading zero; `n > 1` → zero-padded to 2 digits.
-fn fmt_component(n: usize, val: u32) -> String {
-    let mut out = String::new();
+fn fmt_component(out: &mut String, n: usize, val: u32) {
     if n == 1 {
         write!(out, "{val}").unwrap(); // write! to String is infallible
     } else {
         write!(out, "{val:02}").unwrap(); // write! to String is infallible
     }
-    out
 }
 
-fn fmt_frac(sub_sec_ticks: u32, n: usize, trim: bool) -> String {
-    let mut full = String::new();
-    write!(full, "{sub_sec_ticks:07}").unwrap(); // write! to String is infallible
-    let s = &full[..n];
-    if trim {
-        s.trim_end_matches('0').to_string()
-    } else {
-        s.to_string()
+/// Writes the first `n` zero-padded fractional-tick digits (`trim` drops trailing
+/// zeros) directly into `out`, without any intermediate allocation.
+fn fmt_frac(out: &mut String, sub_sec_ticks: u32, n: usize, trim: bool) {
+    let mut digits = [b'0'; 7];
+    let mut val = sub_sec_ticks;
+    for d in digits.iter_mut().rev() {
+        *d = b'0' + (val % 10) as u8;
+        val /= 10;
     }
+    let mut end = n;
+    if trim {
+        while end > 0 && digits[end - 1] == b'0' {
+            end -= 1;
+        }
+    }
+    // digits are ASCII '0'-'9', so this is always valid UTF-8.
+    out.push_str(std::str::from_utf8(&digits[..end]).unwrap());
 }
