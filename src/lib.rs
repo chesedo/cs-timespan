@@ -931,7 +931,7 @@ impl TimeSpan {
         // to custom multi-char formats (TryParseByFormat in TimeSpanParse.cs).
         let custom_fmt = !matches!(fmt, "c" | "t" | "T" | "g" | "G");
         if styles == TimeSpanStyles::AssumeNegative && custom_fmt && ts.ticks > 0 {
-            Ok(TimeSpan::from_ticks(-ts.ticks))
+            Ok(-ts)
         } else {
             Ok(ts)
         }
