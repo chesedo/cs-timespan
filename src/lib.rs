@@ -205,12 +205,30 @@ impl TimeSpan {
     pub const TICKS_PER_HOUR: i64 = 36_000_000_000;
     pub const TICKS_PER_DAY: i64 = 864_000_000_000;
 
-    // Microsecond-unit constants, used only by TimeSpanBuilder's overflow-safe sum.
-    const MICROSECONDS_PER_MILLISECOND: i128 = 1_000;
-    const MICROSECONDS_PER_SECOND: i128 = 1_000_000;
-    const MICROSECONDS_PER_MINUTE: i128 = 60_000_000;
-    const MICROSECONDS_PER_HOUR: i128 = 3_600_000_000;
-    const MICROSECONDS_PER_DAY: i128 = 86_400_000_000;
+    // ── Microsecond-unit constants ─────────────────────────────────────────────
+    pub const MICROSECONDS_PER_MILLISECOND: i64 = 1_000;
+    pub const MICROSECONDS_PER_SECOND: i64 = 1_000_000;
+    pub const MICROSECONDS_PER_MINUTE: i64 = 60_000_000;
+    pub const MICROSECONDS_PER_HOUR: i64 = 3_600_000_000;
+    pub const MICROSECONDS_PER_DAY: i64 = 86_400_000_000;
+
+    // ── Millisecond-unit constants ─────────────────────────────────────────────
+    pub const MILLISECONDS_PER_SECOND: i64 = 1_000;
+    pub const MILLISECONDS_PER_MINUTE: i64 = 60_000;
+    pub const MILLISECONDS_PER_HOUR: i64 = 3_600_000;
+    pub const MILLISECONDS_PER_DAY: i64 = 86_400_000;
+
+    // ── Second-unit constants ──────────────────────────────────────────────────
+    pub const SECONDS_PER_MINUTE: i64 = 60;
+    pub const SECONDS_PER_HOUR: i64 = 3_600;
+    pub const SECONDS_PER_DAY: i64 = 86_400;
+
+    // ── Minute-unit constants ──────────────────────────────────────────────────
+    pub const MINUTES_PER_HOUR: i64 = 60;
+    pub const MINUTES_PER_DAY: i64 = 1_440;
+
+    // ── Hour-unit constants ────────────────────────────────────────────────────
+    pub const HOURS_PER_DAY: i32 = 24;
 
     // ── Boundary constants ─────────────────────────────────────────────────────
     pub const ZERO: TimeSpan = TimeSpan { ticks: 0 };
@@ -1158,11 +1176,12 @@ impl TimeSpanBuilder {
     /// representable range.
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
     pub fn build(self) -> Result<TimeSpan, TimeSpanOverflow> {
-        let total_microseconds: i128 = i128::from(self.days) * TimeSpan::MICROSECONDS_PER_DAY
-            + i128::from(self.hours) * TimeSpan::MICROSECONDS_PER_HOUR
-            + i128::from(self.minutes) * TimeSpan::MICROSECONDS_PER_MINUTE
-            + i128::from(self.seconds) * TimeSpan::MICROSECONDS_PER_SECOND
-            + i128::from(self.milliseconds) * TimeSpan::MICROSECONDS_PER_MILLISECOND
+        let total_microseconds: i128 = i128::from(self.days)
+            * i128::from(TimeSpan::MICROSECONDS_PER_DAY)
+            + i128::from(self.hours) * i128::from(TimeSpan::MICROSECONDS_PER_HOUR)
+            + i128::from(self.minutes) * i128::from(TimeSpan::MICROSECONDS_PER_MINUTE)
+            + i128::from(self.seconds) * i128::from(TimeSpan::MICROSECONDS_PER_SECOND)
+            + i128::from(self.milliseconds) * i128::from(TimeSpan::MICROSECONDS_PER_MILLISECOND)
             + i128::from(self.microseconds);
 
         let max_microseconds = i128::from(i64::MAX) / i128::from(TimeSpan::TICKS_PER_MICROSECOND);
