@@ -542,6 +542,21 @@ fn parse_overflow_seconds_or_minutes_out_of_range() {
     );
 }
 
+// offset_of computes positions via pointer arithmetic on subslices of the original
+// input, not by searching for the value's text — so a coincidental earlier
+// occurrence of the same digits must not shift the reported position.
+#[test]
+fn parse_overflow_position_not_confused_by_earlier_duplicate_value() {
+    // "61" appears twice: as the (valid, since > 23) days component, and as the
+    // out-of-range minutes component. The caret must point at the second one.
+    assert_eq!(
+        TimeSpan::parse("61:10:61").unwrap_err().to_string(),
+        r#"minutes value 61 is out of range; must be 0-59
+  "61:10:61"
+         ^"#,
+    );
+}
+
 // TimeSpanTests.cs#L1141
 #[test]
 fn parse_overflow_ambiguous_hour_colon() {
