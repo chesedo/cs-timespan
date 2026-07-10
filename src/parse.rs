@@ -1,6 +1,6 @@
 use crate::TimeSpan;
 
-/// Why an [`ParseErrorKind::Overflow`] error was triggered.
+/// The reason a [`ParseErrorKind::Overflow`] error was triggered.
 #[derive(Debug, Clone)]
 pub enum OverflowKind {
     /// Hours component was ≥ 24; carries the out-of-range value.
