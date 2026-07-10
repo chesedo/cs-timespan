@@ -208,14 +208,18 @@ fn parse_component_uint(s: Option<&str>, original: &str, neg: bool) -> Result<u6
             original,
         ));
     }
-    s.parse::<u64>().map_err(|_| {
-        let dir = if neg {
-            OverflowKind::TooSmall
-        } else {
-            OverflowKind::TooLarge
-        };
-        overflow(dir, offset_of(original, s), original)
-    })
+    s.bytes()
+        .try_fold(0u64, |acc, b| {
+            acc.checked_mul(10)?.checked_add(u64::from(b - b'0'))
+        })
+        .ok_or_else(|| {
+            let dir = if neg {
+                OverflowKind::TooSmall
+            } else {
+                OverflowKind::TooLarge
+            };
+            overflow(dir, offset_of(original, s), original)
+        })
 }
 
 fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
