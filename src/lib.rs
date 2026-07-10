@@ -998,7 +998,8 @@ impl TimeSpan {
     /// Adds two `TimeSpan`s, returning [`TimeSpanOverflow`] instead of panicking
     /// if the result is outside the representable range.
     ///
-    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator+`.
+    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator+`. See
+    /// also the `+` operator (`Add`), which panics on overflow instead.
     ///
     /// # Errors
     ///
@@ -1013,7 +1014,8 @@ impl TimeSpan {
     /// Subtracts two `TimeSpan`s, returning [`TimeSpanOverflow`] instead of
     /// panicking if the result is outside the representable range.
     ///
-    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator-`.
+    /// Mirrors the `OverflowException` thrown by C#'s `TimeSpan.operator-`. See
+    /// also the binary `-` operator (`Sub`), which panics on overflow instead.
     ///
     /// # Errors
     ///
@@ -1029,6 +1031,7 @@ impl TimeSpan {
     /// panicking for [`TimeSpan::MIN_VALUE`], which has no positive counterpart.
     ///
     /// Mirrors the `OverflowException` thrown by C#'s unary `TimeSpan.operator-`.
+    /// See also the unary `-` operator (`Neg`), which panics on overflow instead.
     ///
     /// # Errors
     ///
@@ -1267,6 +1270,8 @@ impl TryFrom<TimeSpan> for std::time::Duration {
 
 // ── Arithmetic ────────────────────────────────────────────────────────────────
 
+/// Panics on overflow; see [`checked_add`](TimeSpan::checked_add) for a
+/// non-panicking alternative.
 impl std::ops::Add for TimeSpan {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
@@ -1274,6 +1279,8 @@ impl std::ops::Add for TimeSpan {
     }
 }
 
+/// Panics on overflow; see [`checked_sub`](TimeSpan::checked_sub) for a
+/// non-panicking alternative.
 impl std::ops::Sub for TimeSpan {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
@@ -1281,6 +1288,8 @@ impl std::ops::Sub for TimeSpan {
     }
 }
 
+/// Panics on overflow (only possible for [`TimeSpan::MIN_VALUE`]); see
+/// [`checked_neg`](TimeSpan::checked_neg) for a non-panicking alternative.
 impl std::ops::Neg for TimeSpan {
     type Output = Self;
     fn neg(self) -> Self {
