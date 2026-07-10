@@ -4,6 +4,18 @@
 //! Internally stores a signed tick count where 1 tick = 100 nanoseconds,
 //! identical to the C# representation.
 //!
+//! # Is this crate for you?
+//!
+//! This crate exists for one reason: exact compatibility with C#'s `System.TimeSpan`.
+//!
+//! - **Just doing arithmetic with durations?** Use [`std::time::Duration`] or
+//!   [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html).
+//! - **Need to parse or format human-readable duration strings (not C# format)?** Use
+//!   [`humantime`](https://docs.rs/humantime) (`"1h 30m"`) or [`jiff`](https://docs.rs/jiff)
+//!   (ISO 8601 `PT1H30M`).
+//! - **Migrating C# code or exchanging data with a .NET system?** This crate is for you —
+//!   it parses and formats `System.TimeSpan` strings exactly as .NET does.
+//!
 //! # Parsing
 //!
 //! [`TimeSpan::parse`] is lenient (mirrors `TimeSpan.Parse`);
@@ -35,6 +47,27 @@
 //! assert_eq!(ts.to_string_fmt("g").unwrap(), "1:2:03:04.56789");
 //! ```
 //!
+//! # Arithmetic
+//!
+//! Standard Rust operators work on [`TimeSpan`] values:
+//!
+//! ```
+//! use cs_timespan::TimeSpan;
+//!
+//! let hour = TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR);
+//! let half = TimeSpan::from_ticks(TimeSpan::TICKS_PER_HOUR / 2);
+//!
+//! assert_eq!((hour + half).to_string(), "01:30:00");
+//! assert_eq!((hour - half).to_string(), "00:30:00");
+//! assert_eq!((hour * 3).to_string(),    "03:00:00");
+//! assert_eq!((hour / 2).to_string(),    "00:30:00");
+//! assert_eq!((-hour).to_string(),       "-01:00:00");
+//!
+//! // Ratio between two spans (returns f64)
+//! let ratio = hour / half;
+//! assert_eq!(ratio, 2.0);
+//! ```
+//!
 //! # Format strings
 //!
 //! This crate supports the same standard and custom format specifiers as C#.
@@ -63,7 +96,7 @@
 //! cannot be represented as `Duration`; that direction returns [`NegativeTimeSpan`].
 //!
 //! With the optional `chrono` feature, conversions to and from
-//! [`chrono::TimeDelta`] are also available.
+//! [`chrono::TimeDelta`](https://docs.rs/chrono/latest/chrono/struct.TimeDelta.html) are also available.
 //!
 //! [`System.TimeSpan`]: https://learn.microsoft.com/en-us/dotnet/api/system.timespan
 //! [Standard TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
