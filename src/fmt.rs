@@ -33,7 +33,7 @@ pub enum FormatErrorKind {
 /// where it was detected, and the original format string for display purposes.
 #[derive(Debug, Clone)]
 pub struct FormatError {
-    pub kind: FormatErrorKind,
+    kind: FormatErrorKind,
     /// Char index (0-based) of the offending character in the format string.
     pos: usize,
     fmt: Box<str>,
@@ -46,6 +46,12 @@ impl FormatError {
             pos,
             fmt: fmt.into(),
         }
+    }
+
+    /// The category of error.
+    #[must_use]
+    pub fn kind(&self) -> FormatErrorKind {
+        self.kind
     }
 
     /// Char index (0-based) of the offending character in the format string.
