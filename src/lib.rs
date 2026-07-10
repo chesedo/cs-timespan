@@ -941,6 +941,8 @@ impl TimeSpan {
     /// Standard specifiers: `"c"`/`"t"`/`"T"` (constant), `"g"` (general short),
     /// `"G"` (general long). Custom specifiers: `d`, `h`, `m`, `s`, `f`/`F`
     /// for fractional seconds, `%x` for a single specifier, `\x` for a literal.
+    /// For the full reference see [Standard TimeSpan format strings] and
+    /// [Custom TimeSpan format strings].
     ///
     /// ```
     /// use cs_timespan::{TimeSpan, FormatErrorKind};
@@ -956,12 +958,16 @@ impl TimeSpan {
     ///
     /// Returns a [`FormatError`] if the format string contains an unrecognised specifier or
     /// other invalid syntax.
+    ///
+    /// [Standard TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings
+    /// [Custom TimeSpan format strings]: https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings
     pub fn to_string_fmt(&self, fmt: &str) -> Result<String, FormatError> {
         self.to_string_fmt_with_culture(fmt, Locale::en)
     }
 
     /// Formats using the decimal separator of the given locale.
     ///
+    /// `fmt` follows the same syntax as [`to_string_fmt`](Self::to_string_fmt).
     /// Only the `"g"` and `"G"` standard formats and the `f`/`F` custom
     /// specifiers are affected; `"c"`/`"t"`/`"T"` always use `.`.
     ///
