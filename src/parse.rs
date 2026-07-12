@@ -406,8 +406,9 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     let (last_int, frac_s) = if let Some((i, f)) = last.split_once(sep) {
         (i, Some(f))
     } else {
-        if sep != '.' && last.contains('.') {
-            let pos = offset_of(input, last) + last.find('.').unwrap();
+        let other_sep = if sep == '.' { ',' } else { '.' };
+        if last.contains(other_sep) {
+            let pos = offset_of(input, last) + last.find(other_sep).unwrap();
             return Err(ParseError::new(ParseErrorKind::WrongSeparator, pos, input));
         }
         (last, None)

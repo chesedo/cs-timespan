@@ -34,7 +34,7 @@ fn parse_en_us_rejects_comma_separator() {
         TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"unexpected character ','; expected a digit
+        r#"decimal separator does not match the locale
   "6:12:14:45,348"
              ^"#,
     );
