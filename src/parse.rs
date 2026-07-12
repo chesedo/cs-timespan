@@ -490,10 +490,10 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
                 input,
             ));
         }
-        // Unreachable given p1 is always Some at this point (bare-days with no colon
-        // is handled by an earlier early return); kept only because the type system
-        // can't see that invariant.
-        _ => return Err(invalid_structure(LENIENT_EXPECTED, 0, input)),
+        // p1 is always Some at this point (bare-days with no colon is handled by an
+        // earlier early return, same invariant `last`'s .unwrap() above relies on);
+        // the type system just can't see that, so match still needs to cover it.
+        _ => unreachable!("p1 is always Some here"),
     }
 
     b.build()
