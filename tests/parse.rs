@@ -433,6 +433,19 @@ fn parse_invalid_too_many_components_position() {
     );
 }
 
+// Dot-prefixed days ("d.h:mm[:ss]") allows at most two colons; combining it with
+// three colons is one time component too many for that variant specifically (as
+// opposed to the general too-many-components case above, which has no dot prefix).
+#[test]
+fn parse_invalid_dot_days_with_three_colons() {
+    assert_eq!(
+        TimeSpan::parse("1.2:3:4:5").unwrap_err().to_string(),
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
+  "1.2:3:4:5"
+           ^"#,
+    );
+}
+
 // TimeSpanTests.cs#L1124
 #[test]
 fn parse_invalid_wrong_decimal_separator_for_culture() {

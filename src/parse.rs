@@ -481,6 +481,18 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
             b.minutes = Some(mid2);
             b.seconds = Some(last_int);
         }
+        // d.h:m:s:?[.frac] — dot-prefixed days combined with three colons: one time
+        // component too many for the "d." variant (which allows at most h:mm[:ss]).
+        (true, Some(_), Some(_), Some(extra)) => {
+            return Err(invalid_structure(
+                LENIENT_EXPECTED,
+                offset_of(input, extra),
+                input,
+            ));
+        }
+        // Unreachable given p1 is always Some at this point (bare-days with no colon
+        // is handled by an earlier early return); kept only because the type system
+        // can't see that invariant.
         _ => return Err(invalid_structure(LENIENT_EXPECTED, 0, input)),
     }
 
