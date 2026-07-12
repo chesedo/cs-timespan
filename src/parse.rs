@@ -367,8 +367,12 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
-    if it.next().is_some() {
-        return Err(invalid_structure(LENIENT_EXPECTED, 0, input));
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            LENIENT_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
 
     // No colons → bare days only (d.anything requires a colon for the time part).

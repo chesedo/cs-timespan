@@ -417,7 +417,19 @@ fn parse_invalid_too_many_components() {
             .to_string(),
         r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:00:00:00:00:00:00:00"
-   ^"#,
+               ^"#,
+    );
+}
+
+// The caret must point at the first excess component, not always at position 0
+// regardless of where the excess actually starts.
+#[test]
+fn parse_invalid_too_many_components_position() {
+    assert_eq!(
+        TimeSpan::parse("1:2:3:4:5").unwrap_err().to_string(),
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
+  "1:2:3:4:5"
+           ^"#,
     );
 }
 
