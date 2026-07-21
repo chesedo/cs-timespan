@@ -527,9 +527,7 @@ fn parse_constant(input: &str) -> Result<TimeSpan, ParseError> {
     }
 
     let mut it = s.splitn(3, ':');
-    let day_hour = it
-        .next()
-        .ok_or_else(|| invalid_structure(CONSTANT_EXPECTED, 0, input))?;
+    let day_hour = it.next().unwrap(); // splitn always yields at least one item for non-empty s
     let (days_str, hours_s) = match day_hour.split_once('.') {
         Some((d, h)) => (Some(d), h),
         None => (None, day_hour),
