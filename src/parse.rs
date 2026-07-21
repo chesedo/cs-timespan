@@ -589,8 +589,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
-    if it.next().is_some() {
-        return Err(invalid_structure(G_EXPECTED, 0, input));
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            G_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
 
     let mut b = Builder::new(neg, input);
@@ -603,8 +607,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
 
     // h:mm — one colon, no seconds
     if p2.is_none() {
-        if p0.contains(sep) {
-            return Err(invalid_structure(G_EXPECTED, 0, input));
+        if let Some(i) = p0.find(sep) {
+            return Err(invalid_structure(
+                G_EXPECTED,
+                offset_of(input, p0) + i,
+                input,
+            ));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -634,8 +642,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         b.minutes = p2;
     } else {
         // h:mm:ss — p0=h, p1=mm (p2 was last)
-        if p0.contains(sep) {
-            return Err(invalid_structure(G_EXPECTED, 0, input));
+        if let Some(i) = p0.find(sep) {
+            return Err(invalid_structure(
+                G_EXPECTED,
+                offset_of(input, p0) + i,
+                input,
+            ));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -651,21 +663,27 @@ fn parse_g_upper(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
+    // Missing-component errors point at the end of the (sign-stripped) input, since
+    // that's where the required-but-absent component would have started.
+    let end = offset_of(input, s) + s.len();
+
     let mut it = s.split(':');
-    let days = it
-        .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+    let days = it.next().unwrap(); // split always yields at least one item for non-empty s
     let h = it
         .next()
         .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
     let min = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, end, input))?;
     let sec_frac = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
-    if it.next().is_some() {
-        return Err(invalid_structure(G_UPPER_EXPECTED, 0, input));
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, end, input))?;
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            G_UPPER_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
     let (sec_s, frac_s) = sec_frac
         .split_once(sep)
