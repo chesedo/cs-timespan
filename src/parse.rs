@@ -1,6 +1,6 @@
 use crate::TimeSpan;
 
-/// Why an [`ParseErrorKind::Overflow`] error was triggered.
+/// The reason a [`ParseErrorKind::Overflow`] error was triggered.
 #[derive(Debug, Clone)]
 pub enum OverflowKind {
     /// Hours component was ≥ 24; carries the out-of-range value.
@@ -177,7 +177,7 @@ impl<'a> Builder<'a> {
             let pos = self.seconds.map_or(0, |s| offset_of(self.original, s));
             return Err(overflow(OverflowKind::Seconds(sv), pos, self.original));
         }
-        // h ≤ 23, m ≤ 59, sv ≤ 59: safe to narrow and use fast u64 path
+        // h ≤ 23, m ≤ 59, sv ≤ 59: safe to narrow to u32 for build_ticks
         #[allow(clippy::cast_possible_truncation)]
         build_ticks(
             self.neg,
