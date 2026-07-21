@@ -205,12 +205,30 @@ impl TimeSpan {
     pub const TICKS_PER_HOUR: i64 = 36_000_000_000;
     pub const TICKS_PER_DAY: i64 = 864_000_000_000;
 
-    // Microsecond-unit constants, used only by TimeSpanBuilder's overflow-safe sum.
-    const MICROSECONDS_PER_MILLISECOND: i128 = 1_000;
-    const MICROSECONDS_PER_SECOND: i128 = 1_000_000;
-    const MICROSECONDS_PER_MINUTE: i128 = 60_000_000;
-    const MICROSECONDS_PER_HOUR: i128 = 3_600_000_000;
-    const MICROSECONDS_PER_DAY: i128 = 86_400_000_000;
+    // ── Microsecond-unit constants ─────────────────────────────────────────────
+    pub const MICROSECONDS_PER_MILLISECOND: i64 = 1_000;
+    pub const MICROSECONDS_PER_SECOND: i64 = 1_000_000;
+    pub const MICROSECONDS_PER_MINUTE: i64 = 60_000_000;
+    pub const MICROSECONDS_PER_HOUR: i64 = 3_600_000_000;
+    pub const MICROSECONDS_PER_DAY: i64 = 86_400_000_000;
+
+    // ── Millisecond-unit constants ─────────────────────────────────────────────
+    pub const MILLISECONDS_PER_SECOND: i64 = 1_000;
+    pub const MILLISECONDS_PER_MINUTE: i64 = 60_000;
+    pub const MILLISECONDS_PER_HOUR: i64 = 3_600_000;
+    pub const MILLISECONDS_PER_DAY: i64 = 86_400_000;
+
+    // ── Second-unit constants ──────────────────────────────────────────────────
+    pub const SECONDS_PER_MINUTE: i64 = 60;
+    pub const SECONDS_PER_HOUR: i64 = 3_600;
+    pub const SECONDS_PER_DAY: i64 = 86_400;
+
+    // ── Minute-unit constants ──────────────────────────────────────────────────
+    pub const MINUTES_PER_HOUR: i64 = 60;
+    pub const MINUTES_PER_DAY: i64 = 1_440;
+
+    // ── Hour-unit constants ────────────────────────────────────────────────────
+    pub const HOURS_PER_DAY: i32 = 24;
 
     // ── Boundary constants ─────────────────────────────────────────────────────
     pub const ZERO: TimeSpan = TimeSpan { ticks: 0 };
@@ -388,15 +406,17 @@ impl TimeSpan {
     ///
     /// assert_eq!(TimeSpan::from_microseconds_f64(15.0).unwrap().ticks(), 150);
     /// ```
+    #[allow(clippy::cast_precision_loss)]
     pub fn from_microseconds_f64(value: f64) -> Result<Self, FloatError> {
-        Self::interval(value, 10.0)
+        Self::interval(value, Self::TICKS_PER_MICROSECOND as f64)
     }
 
     // ── Float multiply/divide (mirror TimeSpan.Multiply(double)/Divide(double)) ──
-    // TimeSpan.cs#L689-L691, L908-L934: C# rounds to the nearest tick via
-    // `Math.Round`, which defaults to `MidpointRounding.ToEven` — hence
-    // `round_ties_even()` below rather than `round()` (which breaks ties away
-    // from zero and would diverge from C# on exact half-tick results).
+    // TimeSpan.cs#L689-L691 (Multiply/Divide) forward to the operators at
+    // L908-L934, which round via `Math.Round` — defaulting to
+    // `MidpointRounding.ToEven` — hence `round_ties_even()` below rather than
+    // `round()` (which breaks ties away from zero and would diverge from C#
+    // on exact half-tick results).
     // `Result` is used instead of throwing, per this crate's established
     // convention for anything that can hit NaN/overflow (see `from_days_f64`
     // and friends above).
@@ -929,7 +949,7 @@ impl TimeSpan {
         // to custom multi-char formats (TryParseByFormat in TimeSpanParse.cs).
         let custom_fmt = !matches!(fmt, "c" | "t" | "T" | "g" | "G");
         if styles == TimeSpanStyles::AssumeNegative && custom_fmt && ts.ticks > 0 {
-            Ok(TimeSpan::from_ticks(-ts.ticks))
+            Ok(-ts)
         } else {
             Ok(ts)
         }
@@ -951,7 +971,7 @@ impl TimeSpan {
     /// assert_eq!(ts.to_string_fmt("c").unwrap(),          "1.10:17:36.7890123");
     /// assert_eq!(ts.to_string_fmt(r"d\.hh\:mm").unwrap(), "1.10:17");
     /// assert_eq!(ts.to_string_fmt("hh").unwrap(),         "10");
-    /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind, FormatErrorKind::InvalidStandardFormat('x'));
+    /// assert_eq!(ts.to_string_fmt("x").unwrap_err().kind(), FormatErrorKind::InvalidStandardFormat('x'));
     /// ```
     ///
     /// # Errors
@@ -1156,11 +1176,12 @@ impl TimeSpanBuilder {
     /// representable range.
     #[allow(clippy::cast_possible_truncation)] // bounds-checked against i64::MIN/MAX above
     pub fn build(self) -> Result<TimeSpan, TimeSpanOverflow> {
-        let total_microseconds: i128 = i128::from(self.days) * TimeSpan::MICROSECONDS_PER_DAY
-            + i128::from(self.hours) * TimeSpan::MICROSECONDS_PER_HOUR
-            + i128::from(self.minutes) * TimeSpan::MICROSECONDS_PER_MINUTE
-            + i128::from(self.seconds) * TimeSpan::MICROSECONDS_PER_SECOND
-            + i128::from(self.milliseconds) * TimeSpan::MICROSECONDS_PER_MILLISECOND
+        let total_microseconds: i128 = i128::from(self.days)
+            * i128::from(TimeSpan::MICROSECONDS_PER_DAY)
+            + i128::from(self.hours) * i128::from(TimeSpan::MICROSECONDS_PER_HOUR)
+            + i128::from(self.minutes) * i128::from(TimeSpan::MICROSECONDS_PER_MINUTE)
+            + i128::from(self.seconds) * i128::from(TimeSpan::MICROSECONDS_PER_SECOND)
+            + i128::from(self.milliseconds) * i128::from(TimeSpan::MICROSECONDS_PER_MILLISECOND)
             + i128::from(self.microseconds);
 
         let max_microseconds = i128::from(i64::MAX) / i128::from(TimeSpan::TICKS_PER_MICROSECOND);

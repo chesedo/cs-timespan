@@ -55,7 +55,7 @@ impl Eq for ParseErrorKind {}
 /// where it was detected, and the original input string for display purposes.
 #[derive(Debug, Clone)]
 pub struct ParseError {
-    pub kind: ParseErrorKind,
+    kind: ParseErrorKind,
     pos: usize,
     input: Box<str>,
 }
@@ -67,6 +67,12 @@ impl ParseError {
             pos,
             input: input.into(),
         }
+    }
+
+    /// The category of error.
+    #[must_use]
+    pub fn kind(&self) -> &ParseErrorKind {
+        &self.kind
     }
 
     /// Byte index (0-based) of the offending character in the input string.
