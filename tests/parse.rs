@@ -34,7 +34,7 @@ fn parse_en_us_rejects_comma_separator() {
         TimeSpan::parse_with_culture("6:12:14:45,348", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"unexpected character ','; expected a digit
+        r#"decimal separator does not match the locale
   "6:12:14:45,348"
              ^"#,
     );
@@ -349,6 +349,26 @@ fn parse_invalid_negative_component() {
     );
 }
 
+// str::parse::<u64>() accepts an optional leading '+' on its own (e.g. "+123" -> Ok(123)),
+// which C#'s TimeSpan parsing does not — the digit-only pre-check must reject it before
+// parse::<u64>() ever runs, since parse::<u64>() succeeding wouldn't give us a chance to
+// reject it after the fact.
+#[test]
+fn parse_invalid_leading_plus_component() {
+    assert_eq!(
+        TimeSpan::parse("+12:24:02").unwrap_err().to_string(),
+        r#"unexpected character '+'; expected a digit
+  "+12:24:02"
+   ^"#,
+    );
+    assert_eq!(
+        TimeSpan::parse("00:00:+01").unwrap_err().to_string(),
+        r#"unexpected character '+'; expected a digit
+  "00:00:+01"
+         ^"#,
+    );
+}
+
 // TimeSpanTests.cs#L1116-1118
 #[test]
 fn parse_invalid_embedded_null_chars() {
@@ -397,7 +417,32 @@ fn parse_invalid_too_many_components() {
             .to_string(),
         r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
   "00:00:00:00:00:00:00:00"
-   ^"#,
+               ^"#,
+    );
+}
+
+// The caret must point at the first excess component, not always at position 0
+// regardless of where the excess actually starts.
+#[test]
+fn parse_invalid_too_many_components_position() {
+    assert_eq!(
+        TimeSpan::parse("1:2:3:4:5").unwrap_err().to_string(),
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
+  "1:2:3:4:5"
+           ^"#,
+    );
+}
+
+// Dot-prefixed days ("d.h:mm[:ss]") allows at most two colons; combining it with
+// three colons is one time component too many for that variant specifically (as
+// opposed to the general too-many-components case above, which has no dot prefix).
+#[test]
+fn parse_invalid_dot_days_with_three_colons() {
+    assert_eq!(
+        TimeSpan::parse("1.2:3:4:5").unwrap_err().to_string(),
+        r#"unrecognised input structure; expected [-][d.]h:mm[:ss[.FFFFFFF]] or [-]d:h:mm:ss[.FFFFFFF]
+  "1.2:3:4:5"
+           ^"#,
     );
 }
 
@@ -427,7 +472,7 @@ fn parse_overflow_too_many_fractional_digits() {
     // No leading zeros: value (99999999) > MaxFraction → Overflow
     assert_eq!(
         TimeSpan::parse("1:1:1.99999999").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "1:1:1.99999999"
          ^"#,
     );
@@ -448,25 +493,25 @@ fn parse_frac_leading_zeros_beyond_7_rounds_to_nearest_tick() {
 fn parse_overflow_days_exceed_max() {
     assert_eq!(
         TimeSpan::parse("2147483647").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "2147483647"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("2147483648").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "2147483648"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("10675200").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675200"
    ^"#,
     );
     assert_eq!(
         TimeSpan::parse("10675200:00:00").unwrap_err().to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675200:00:00"
    ^"#,
     );
@@ -479,7 +524,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:03:00:00")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:03:00:00"
    ^"#,
     );
@@ -487,7 +532,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:02:49:00")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:49:00"
    ^"#,
     );
@@ -495,7 +540,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("10675199:02:48:06")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:48:06"
    ^"#,
     );
@@ -503,7 +548,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse("-10675199:02:48:06")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value is below the minimum representable range
   "-10675199:02:48:06"
    ^"#,
     );
@@ -511,7 +556,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse_with_culture("10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "10675199:02:48:05.4776"
    ^"#,
     );
@@ -519,7 +564,7 @@ fn parse_overflow_exceeds_max_value() {
         TimeSpan::parse_with_culture("-10675199:02:48:05.4776", Locale::en)
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value is below the minimum representable range
   "-10675199:02:48:05.4776"
    ^"#,
     );
@@ -539,6 +584,21 @@ fn parse_overflow_seconds_or_minutes_out_of_range() {
         r#"minutes value 60 is out of range; must be 0-59
   "00:60:00"
       ^"#,
+    );
+}
+
+// offset_of computes positions via pointer arithmetic on subslices of the original
+// input, not by searching for the value's text — so a coincidental earlier
+// occurrence of the same digits must not shift the reported position.
+#[test]
+fn parse_overflow_position_not_confused_by_earlier_duplicate_value() {
+    // "61" appears twice: as the (valid, since > 23) days component, and as the
+    // out-of-range minutes component. The caret must point at the second one.
+    assert_eq!(
+        TimeSpan::parse("61:10:61").unwrap_err().to_string(),
+        r#"minutes value 61 is out of range; must be 0-59
+  "61:10:61"
+         ^"#,
     );
 }
 

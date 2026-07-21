@@ -9,8 +9,10 @@ pub enum OverflowKind {
     Minutes(u64),
     /// Seconds component was ≥ 60; carries the out-of-range value.
     Seconds(u64),
-    /// Total tick value exceeds [`TimeSpan::MAX_VALUE`] or is below [`TimeSpan::MIN_VALUE`].
-    Value,
+    /// Total tick value exceeds [`TimeSpan::MAX_VALUE`].
+    TooLarge,
+    /// Total tick value is below [`TimeSpan::MIN_VALUE`].
+    TooSmall,
 }
 
 /// The category of error returned when a time-span string fails to parse.
@@ -110,8 +112,11 @@ impl std::fmt::Display for ParseError {
                 OverflowKind::Seconds(s) => {
                     writeln!(f, "seconds value {s} is out of range; must be 0-59")?;
                 }
-                OverflowKind::Value => {
-                    writeln!(f, "TimeSpan value is outside the representable range")?;
+                OverflowKind::TooLarge => {
+                    writeln!(f, "TimeSpan value exceeds the maximum representable range")?;
+                }
+                OverflowKind::TooSmall => {
+                    writeln!(f, "TimeSpan value is below the minimum representable range")?;
                 }
             },
         }
@@ -166,11 +171,11 @@ impl<'a> Builder<'a> {
     // seconds >= 60 with OverflowException unconditionally — standard and custom
     // format parsing both route through it, so there's no lenient/normalizing path.
     fn build(self) -> Result<TimeSpan, ParseError> {
-        let days = parse_component_uint(self.days, self.original)?;
-        let h = parse_component_uint(self.hours, self.original)?;
-        let m = parse_component_uint(self.minutes, self.original)?;
-        let sv = parse_component_uint(self.seconds, self.original)?;
-        let frac = parse_component_frac(self.frac, self.original)?;
+        let days = parse_component_uint(self.days, self.original, self.neg)?;
+        let h = parse_component_uint(self.hours, self.original, self.neg)?;
+        let m = parse_component_uint(self.minutes, self.original, self.neg)?;
+        let sv = parse_component_uint(self.seconds, self.original, self.neg)?;
+        let frac = parse_component_frac(self.frac, self.original, self.neg)?;
         if h >= 24 {
             let pos = self.hours.map_or(0, |s| offset_of(self.original, s));
             return Err(overflow(OverflowKind::Hours(h), pos, self.original));
@@ -197,45 +202,47 @@ impl<'a> Builder<'a> {
     }
 }
 
-fn parse_component_uint(s: Option<&str>, original: &str) -> Result<u64, ParseError> {
-    match s {
-        None | Some("") => Ok(0),
-        Some(s) => parse_uint(s, original),
-    }
-}
-
-fn parse_component_frac(s: Option<&str>, original: &str) -> Result<u32, ParseError> {
-    match s {
-        None => Ok(0),
-        Some(s) => parse_frac(s, original),
-    }
-}
-
-fn parse_uint(s: &str, original: &str) -> Result<u64, ParseError> {
-    let base = offset_of(original, s);
-    if s.is_empty() {
-        return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
-    }
+fn parse_component_uint(s: Option<&str>, original: &str, neg: bool) -> Result<u64, ParseError> {
+    let s = match s {
+        None | Some("") => return Ok(0),
+        Some(s) => s,
+    };
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
-            base + i,
+            offset_of(original, s) + i,
             original,
         ));
     }
-    s.parse::<u64>()
-        .map_err(|_| overflow(OverflowKind::Value, base, original))
+    s.bytes()
+        .try_fold(0u64, |acc, b| {
+            acc.checked_mul(10)?.checked_add(u64::from(b - b'0'))
+        })
+        .ok_or_else(|| {
+            let dir = if neg {
+                OverflowKind::TooSmall
+            } else {
+                OverflowKind::TooLarge
+            };
+            overflow(dir, offset_of(original, s), original)
+        })
 }
 
-fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
-    let base = offset_of(original, s);
+fn parse_component_frac(s: Option<&str>, original: &str, neg: bool) -> Result<u32, ParseError> {
+    let Some(s) = s else {
+        return Ok(0);
+    };
     if s.is_empty() {
-        return Err(ParseError::new(ParseErrorKind::NonDigit, base, original));
+        return Err(ParseError::new(
+            ParseErrorKind::NonDigit,
+            offset_of(original, s),
+            original,
+        ));
     }
     if let Some(i) = s.bytes().position(|b| !b.is_ascii_digit()) {
         return Err(ParseError::new(
             ParseErrorKind::NonDigit,
-            base + i,
+            offset_of(original, s) + i,
             original,
         ));
     }
@@ -252,7 +259,12 @@ fn parse_frac(s: &str, original: &str) -> Result<u32, ParseError> {
     // Fractions with no leading zeros and len > 7 always exceed MaxFraction (9_999_999).
     let zeroes = s.bytes().take_while(|&b| b == b'0').count();
     if zeroes == 0 {
-        return Err(overflow(OverflowKind::Value, base, original));
+        let dir = if neg {
+            OverflowKind::TooSmall
+        } else {
+            OverflowKind::TooLarge
+        };
+        return Err(overflow(dir, offset_of(original, s), original));
     }
     if zeroes > 7 {
         return Ok(0);
@@ -285,7 +297,16 @@ fn build_ticks(
     frac: u32,
     original: &str,
 ) -> Result<TimeSpan, ParseError> {
-    let ovf = || overflow(OverflowKind::Value, 0, original);
+    // `neg` fully determines direction here: the two range checks below only ever
+    // reject on the side matching the input's own sign.
+    let ovf = || {
+        let dir = if neg {
+            OverflowKind::TooSmall
+        } else {
+            OverflowKind::TooLarge
+        };
+        overflow(dir, 0, original)
+    };
     // h ≤ 23, m ≤ 59, s ≤ 59, frac ≤ 9_999_999: sub ≤ 864_000_000_000 — well within u64
     let sub = u64::from(h) * TimeSpan::TICKS_PER_HOUR.unsigned_abs()
         + u64::from(m) * TimeSpan::TICKS_PER_MINUTE.unsigned_abs()
@@ -352,8 +373,12 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
-    if it.next().is_some() {
-        return Err(invalid_structure(LENIENT_EXPECTED, 0, input));
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            LENIENT_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
 
     // No colons → bare days only (d.anything requires a colon for the time part).
@@ -387,8 +412,9 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
     let (last_int, frac_s) = if let Some((i, f)) = last.split_once(sep) {
         (i, Some(f))
     } else {
-        if sep != '.' && last.contains('.') {
-            let pos = offset_of(input, last) + last.find('.').unwrap();
+        let other_sep = if sep == '.' { ',' } else { '.' };
+        if last.contains(other_sep) {
+            let pos = offset_of(input, last) + last.find(other_sep).unwrap();
             return Err(ParseError::new(ParseErrorKind::WrongSeparator, pos, input));
         }
         (last, None)
@@ -435,7 +461,7 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
                     input,
                 ));
             }
-            let first_val = parse_component_uint(Some(first_s), input)?;
+            let first_val = parse_component_uint(Some(first_s), input, neg)?;
             if first_val > 23 {
                 b.days = Some(first_s);
                 b.hours = Some(mid);
@@ -461,7 +487,19 @@ pub(crate) fn parse_lenient(input: &str, sep: char) -> Result<TimeSpan, ParseErr
             b.minutes = Some(mid2);
             b.seconds = Some(last_int);
         }
-        _ => return Err(invalid_structure(LENIENT_EXPECTED, 0, input)),
+        // d.h:m:s:?[.frac] — dot-prefixed days combined with three colons: one time
+        // component too many for the "d." variant (which allows at most h:mm[:ss]).
+        (true, Some(_), Some(_), Some(extra)) => {
+            return Err(invalid_structure(
+                LENIENT_EXPECTED,
+                offset_of(input, extra),
+                input,
+            ));
+        }
+        // p1 is always Some at this point (bare-days with no colon is handled by an
+        // earlier early return, same invariant `last`'s .unwrap() above relies on);
+        // the type system just can't see that, so match still needs to cover it.
+        _ => unreachable!("p1 is always Some here"),
     }
 
     b.build()
@@ -495,9 +533,7 @@ fn parse_constant(input: &str) -> Result<TimeSpan, ParseError> {
     }
 
     let mut it = s.splitn(3, ':');
-    let day_hour = it
-        .next()
-        .ok_or_else(|| invalid_structure(CONSTANT_EXPECTED, 0, input))?;
+    let day_hour = it.next().unwrap(); // splitn always yields at least one item for non-empty s
     let (days_str, hours_s) = match day_hour.split_once('.') {
         Some((d, h)) => (Some(d), h),
         None => (None, day_hour),
@@ -559,8 +595,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
     let p1 = it.next();
     let p2 = it.next();
     let p3 = it.next();
-    if it.next().is_some() {
-        return Err(invalid_structure(G_EXPECTED, 0, input));
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            G_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
 
     let mut b = Builder::new(neg, input);
@@ -573,8 +613,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
 
     // h:mm — one colon, no seconds
     if p2.is_none() {
-        if p0.contains(sep) {
-            return Err(invalid_structure(G_EXPECTED, 0, input));
+        if let Some(i) = p0.find(sep) {
+            return Err(invalid_structure(
+                G_EXPECTED,
+                offset_of(input, p0) + i,
+                input,
+            ));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -604,8 +648,12 @@ fn parse_g(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         b.minutes = p2;
     } else {
         // h:mm:ss — p0=h, p1=mm (p2 was last)
-        if p0.contains(sep) {
-            return Err(invalid_structure(G_EXPECTED, 0, input));
+        if let Some(i) = p0.find(sep) {
+            return Err(invalid_structure(
+                G_EXPECTED,
+                offset_of(input, p0) + i,
+                input,
+            ));
         }
         b.hours = Some(p0);
         b.minutes = p1;
@@ -622,20 +670,24 @@ fn parse_g_upper(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
     }
 
     let mut it = s.split(':');
-    let days = it
-        .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+    let days = it.next().unwrap(); // split always yields at least one item for non-empty s
     let h = it
         .next()
         .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+    // Missing-component errors point at the end of the (sign-stripped) input, since
+    // that's where the required-but-absent component would have started.
     let min = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, offset_of(input, s) + s.len(), input))?;
     let sec_frac = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
-    if it.next().is_some() {
-        return Err(invalid_structure(G_UPPER_EXPECTED, 0, input));
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, offset_of(input, s) + s.len(), input))?;
+    if let Some(extra) = it.next() {
+        return Err(invalid_structure(
+            G_UPPER_EXPECTED,
+            offset_of(input, extra),
+            input,
+        ));
     }
     let (sec_s, frac_s) = sec_frac
         .split_once(sep)

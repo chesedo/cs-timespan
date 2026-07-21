@@ -447,7 +447,33 @@ fn parse_exact_g_rejects_dot_separated_days() {
             .to_string(),
         r#"unrecognised input structure; expected [-][d:]h:mm[:ss[.FFFFFFF]]
   "1.12:24:02"
-   ^"#,
+    ^"#,
+    );
+}
+
+// Caret must point at the excess component, not always position 0.
+#[test]
+fn parse_exact_g_too_many_components_position() {
+    assert_eq!(
+        TimeSpan::parse_exact("1:2:3:4:5", "g")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected [-][d:]h:mm[:ss[.FFFFFFF]]
+  "1:2:3:4:5"
+           ^"#,
+    );
+}
+
+// Caret must point at the separator itself, not always position 0.
+#[test]
+fn parse_exact_g_rejects_dot_separated_days_one_colon_position() {
+    assert_eq!(
+        TimeSpan::parse_exact("1.5:30", "g")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected [-][d:]h:mm[:ss[.FFFFFFF]]
+  "1.5:30"
+    ^"#,
     );
 }
 
@@ -462,6 +488,39 @@ fn parse_exact_g_upper_rejects_colon_without_fractional() {
         r#"unrecognised input structure; expected [-]d:hh:mm:ss.fffffff
   "1:12:24:02"
            ^"#,
+    );
+}
+
+// Missing components must point at the end of the input (where the missing part
+// would have started), not always position 0.
+#[test]
+fn parse_exact_g_upper_missing_component_position() {
+    assert_eq!(
+        TimeSpan::parse_exact("5:30", "G").unwrap_err().to_string(),
+        r#"unrecognised input structure; expected [-]d:hh:mm:ss.fffffff
+  "5:30"
+       ^"#,
+    );
+    assert_eq!(
+        TimeSpan::parse_exact("5:30:45", "G")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected [-]d:hh:mm:ss.fffffff
+  "5:30:45"
+          ^"#,
+    );
+}
+
+// Caret must point at the excess component, not always position 0.
+#[test]
+fn parse_exact_g_upper_too_many_components_position() {
+    assert_eq!(
+        TimeSpan::parse_exact("1:12:24:02.9990000:extra", "G")
+            .unwrap_err()
+            .to_string(),
+        r#"unrecognised input structure; expected [-]d:hh:mm:ss.fffffff
+  "1:12:24:02.9990000:extra"
+                      ^"#,
     );
 }
 
@@ -1003,7 +1062,7 @@ fn parse_exact_overflow_g_upper_too_many_fractional_digits() {
         TimeSpan::parse_exact("1:07:45:16.99999999", "G")
             .unwrap_err()
             .to_string(),
-        r#"TimeSpan value is outside the representable range
+        r#"TimeSpan value exceeds the maximum representable range
   "1:07:45:16.99999999"
               ^"#,
     );
