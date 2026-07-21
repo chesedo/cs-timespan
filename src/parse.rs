@@ -663,21 +663,19 @@ fn parse_g_upper(input: &str, sep: char) -> Result<TimeSpan, ParseError> {
         return Err(ParseError::new(ParseErrorKind::Empty, 0, input));
     }
 
-    // Missing-component errors point at the end of the (sign-stripped) input, since
-    // that's where the required-but-absent component would have started.
-    let end = offset_of(input, s) + s.len();
-
     let mut it = s.split(':');
     let days = it.next().unwrap(); // split always yields at least one item for non-empty s
     let h = it
         .next()
         .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, 0, input))?;
+    // Missing-component errors point at the end of the (sign-stripped) input, since
+    // that's where the required-but-absent component would have started.
     let min = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, end, input))?;
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, offset_of(input, s) + s.len(), input))?;
     let sec_frac = it
         .next()
-        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, end, input))?;
+        .ok_or_else(|| invalid_structure(G_UPPER_EXPECTED, offset_of(input, s) + s.len(), input))?;
     if let Some(extra) = it.next() {
         return Err(invalid_structure(
             G_UPPER_EXPECTED,
